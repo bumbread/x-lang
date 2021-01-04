@@ -24,6 +24,15 @@ u64      typedef ptr;
 #define  mb      1024*kb
 #define  gb      1024*mb
 
+#include<stdarg.h>
+void panicf(char *message, ...) {
+  va_list args;
+  va_start(args, message);
+  vprintf("%s\n", message, args);
+  va_end(args);
+  exit(1);
+}
+
 enum {
   TOKEN_EOF = 0,   // end of file
   // all ascii characters are a separate token
@@ -126,15 +135,14 @@ static i64 parse_expr3(t_lexstate *state) {
   else if(token_match(state, '(')) {
     i64 res = parse_expr(state);
     if(false == token_match(state, ')')) {
-      printf("fatal: unmatched parenthesis\n");
-      // panic
+      panicf("fatal: unmatched parenthesis");
     }
     return res;
   }
   else {
-    printf("fatal: unexpected token\n");
-    return 0;
+    panicf("fatal: unexpected token");
   }
+  return 0;
 }
 
 static i64 parse_expr2(t_lexstate *state) {
@@ -149,7 +157,12 @@ static i64 parse_expr1(t_lexstate *state) {
     state_parse_next_token(state);
     i64 rval = parse_expr2(state);
     if(op == '*') val *= rval;
-    if(op == '/') val /= rval;
+    if(op == '/') {
+      if (rval == 0) {
+        panicf("error division by zero");
+      }
+      val /= rval;
+    }
   }
   return val;
 }
