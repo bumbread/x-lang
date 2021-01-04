@@ -1,4 +1,6 @@
 #include<ctype.h>
+#include<assert.h>
+#include<stdlib.h>
 
 #include<stdint.h>
 int8_t   typedef i8;
@@ -18,6 +20,9 @@ u64      typedef ptr;
 #define  true    ((bool)1)
 #define  false   ((bool)0)
 #define  null    ((void *)0)
+#define  kb      1024
+#define  mb      1024*kb
+#define  gb      1024*mb
 
 enum {
   TOKEN_EOF = 0,   // end of file
@@ -109,15 +114,32 @@ static void token_print(t_token token) {
 }
 
 #include<stdio.h>
+#include"memory.c"
 int main(void) {
-  char const *string = "+()abndk*12898888__as2(2)*&";
+  char const *string = "+()abndk*18888__as2(2)*&";
   t_lexstate state;
   state_init(&state, string);
+  
+  u64 tokens_count = 0;
+  t_stack tokens;
+  ptr size = 10*kb;
+  stack_init(&tokens, size, malloc(size), sizeof(t_token), 0x100);
+  
   do {
     state_parse_next_token(&state);
-    token_print(state.last_token);
-    printf(" ");
+    
+    t_token *next_token = stack_push(&tokens);
+    *next_token = state.last_token;
+    tokens_count += 1;
+    
+    token_print(next_token[0]);
+    printf("\t\t%p\n", next_token);
   } while(state.last_token.kind != 0);
+  
+  for(u64 i = 0; i < tokens_count; i += 1) {
+    
+    printf(" ");
+  }
   
   return 0;
 }
