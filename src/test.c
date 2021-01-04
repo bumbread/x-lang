@@ -9,9 +9,19 @@ static void token_print(t_token token) {
   else if(token.kind == TOKEN_IDN) {
     printf("[%.*s]", (int)(token.end - token.start), token.start);
   }
-  else if(token.kind == TOKEN_EOF) {
-    printf("{EOF}");
-  }
+  else if(token.kind == TOKEN_OP_LOG_OR) {printf("||");}
+  else if(token.kind == TOKEN_OP_LOG_AND) {printf("&&");}
+  else if(token.kind == TOKEN_OP_REL_EQ) {printf("==");}
+  else if(token.kind == TOKEN_OP_REL_NEQ) {printf("!=");}
+  else if(token.kind == TOKEN_OP_REL_GEQ) {printf(">=");}
+  else if(token.kind == TOKEN_OP_REL_LEQ) {printf("<=");}
+  else if(token.kind == TOKEN_OP_LOG_SHIFTL) {printf("<<");}
+  else if(token.kind == TOKEN_OP_LOG_SHIFTR) {printf(">>");}
+  else if(token.kind == TOKEN_OP_ARITHM_SHIFTL) {printf("<<<");}
+  else if(token.kind == TOKEN_OP_ARITHM_SHIFTR) {printf(">>>");}
+  else if(token.kind == TOKEN_OP_BIG_ARROW) {printf("=>");}
+  else if(token.kind == TOKEN_OP_ARROW) {printf("->");}
+  else if(token.kind == TOKEN_EOF) {printf("{EOF}");}
   else {
     printf("{invalid token}\n");
   }
@@ -38,7 +48,7 @@ static void test_parsing(void) {
 #undef test
 
 static void test_lexing(void) {
-  char const *string = "+()abndk*18888__as2(2)*&";
+  char const *string = "+(!=+>>&& == 2)abndk*<<<18888__as2(2)*&";
   t_lexstate state;
   state_init(&state, string);
   do {

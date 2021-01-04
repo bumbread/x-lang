@@ -49,10 +49,23 @@ void reset_error(void) {
 
 enum {
   TOKEN_EOF = 0,   // end of file
-  // all ascii characters are a separate token
+  // All ascii characters are a separate token
   // 0..127
   TOKEN_INT = 128, // integer numbers
-  TOKEN_IDN = 129, // identifiers/names
+  TOKEN_IDN, // identifiers/names
+  // Operators having more than one symbol
+  TOKEN_OP_LOG_OR,        // ||
+  TOKEN_OP_LOG_AND,       // &&
+  TOKEN_OP_REL_EQ,        // ==
+  TOKEN_OP_REL_NEQ,       // !=
+  TOKEN_OP_REL_GEQ,       // >=
+  TOKEN_OP_REL_LEQ,       // <=
+  TOKEN_OP_LOG_SHIFTL,    // <<
+  TOKEN_OP_LOG_SHIFTR,    // >>
+  TOKEN_OP_ARITHM_SHIFTL, // <<<
+  TOKEN_OP_ARITHM_SHIFTR, // >>>
+  TOKEN_OP_BIG_ARROW,     // =>
+  TOKEN_OP_ARROW,         // ->
 } typedef t_token_kind;
 
 struct {
@@ -111,10 +124,83 @@ static void state_parse_next_token(t_lexstate *state) {
       }
       continue;
     }
-    else {
-      state->last_token.kind = *state->stream;
+    else { // parse operators.
+      
+      char first_char = *state->stream;
       state->offset += 1;
       state->stream += 1;
+      if(first_char == '|') {
+        if(*state->stream == '|') { // ||
+          state->offset += 1;
+          state->stream += 1;
+          state->last_token.kind = TOKEN_OP_LOG_OR;
+        }
+        else state->last_token.kind = first_char;
+      }
+      else if(first_char == '&') {
+        if(*state->stream == '|') { // &&
+          state->offset += 1;
+          state->stream += 1;
+          state->last_token.kind = TOKEN_OP_LOG_AND;
+        }
+        else state->last_token.kind = first_char;
+      }
+      else if(first_char == '=') {
+        if(*state->stream == '=') { // ==
+          state->offset += 1;
+          state->stream += 1;
+          state->last_token.kind = TOKEN_OP_REL_EQ;
+        }
+        else if(*state->stream == '>') { // =>
+          state->offset += 1;
+          state->stream += 1;
+          state->last_token.kind = TOKEN_OP_BIG_ARROW;
+        }
+        else state->last_token.kind = first_char;
+      }
+      else if(first_char == '>') {
+        if(*state->stream == '=') { // >=
+          state->offset += 1;
+          state->stream += 1;
+          state->last_token.kind = TOKEN_OP_REL_GEQ;
+        }
+        else if(*state->stream == '>') { // >>
+          state->offset += 1;
+          state->stream += 1;
+          if(*state->stream == '>') { // >>>
+            state->last_token.kind = TOKEN_OP_ARITHM_SHIFTR;
+          }
+          else state->last_token.kind = TOKEN_OP_LOG_SHIFTR;
+        }
+        else state->last_token.kind = first_char;
+      }
+      else if(first_char == '<') {
+        if(*state->stream == '=') { // <=
+          state->offset += 1;
+          state->stream += 1;
+          state->last_token.kind = TOKEN_OP_REL_LEQ;
+        }
+        else if(*state->stream == '<') { // <<
+          state->offset += 1;
+          state->stream += 1;
+          if(*state->stream == '<') { // >>>
+            state->last_token.kind = TOKEN_OP_ARITHM_SHIFTL;
+          }
+          else state->last_token.kind = TOKEN_OP_LOG_SHIFTL;
+        }
+        else state->last_token.kind = first_char;
+      }
+      else if(first_char == '!') {
+        if(*state->stream == '=') {
+          state->offset += 1;
+          state->stream += 1;
+          state->last_token.kind = TOKEN_OP_REL_NEQ;
+        }
+        else state->last_token.kind = first_char;
+      }
+      else {
+        state->last_token.kind = first_char;
+      }
     }
     char const *end = state->stream;
     state->last_token.start = start;
@@ -124,12 +210,20 @@ static void state_parse_next_token(t_lexstate *state) {
 }
 
 static char *get_nonchar_token_kind_name(t_token_kind kind) {
-  if(kind == TOKEN_INT) {
-    return "INT";
-  }
-  else if(kind == TOKEN_IDN) {
-    return "NAME";
-  }
+  if(kind == TOKEN_INT) {return "INT";}
+  else if(kind == TOKEN_IDN) {return "NAME";}
+  else if(kind == TOKEN_OP_LOG_OR) {return "||";}
+  else if(kind == TOKEN_OP_LOG_AND) {return "&&";}
+  else if(kind == TOKEN_OP_REL_EQ) {return "==";}
+  else if(kind == TOKEN_OP_REL_NEQ) {return "!=";}
+  else if(kind == TOKEN_OP_REL_GEQ) {return ">=";}
+  else if(kind == TOKEN_OP_REL_LEQ) {return "<=";}
+  else if(kind == TOKEN_OP_LOG_SHIFTL) {return "<<";}
+  else if(kind == TOKEN_OP_LOG_SHIFTR) {return ">>";}
+  else if(kind == TOKEN_OP_ARITHM_SHIFTL) {return "<<<";}
+  else if(kind == TOKEN_OP_ARITHM_SHIFTR) {return ">>>";}
+  else if(kind == TOKEN_OP_BIG_ARROW) {return "=>";}
+  else if(kind == TOKEN_OP_ARROW) {return "->";}
   return "{unknown token}";
 }
 
