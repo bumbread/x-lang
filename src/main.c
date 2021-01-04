@@ -258,7 +258,7 @@ int main(void) {
   last_error = null;
   while(true) {
     char buf[256];
-    printf("> "); fgets(buf, sizeof buf, stdin);
+    printf("x-shell$ "); fgets(buf, sizeof buf, stdin);
     u64 result = test_parse_expression(buf);
     if(last_error == null) {
       printf("%lld\n", result);
