@@ -4,7 +4,7 @@ static void token_print(t_token token) {
     printf("'%c'", token.kind);
   }
   else if(token.kind == TOKEN_INT) {
-    printf("%d", token.int_value);
+    printf("%lld", token.int_value);
   }
   else if(token.kind == TOKEN_IDN) {
     printf("[%.*s]", (int)(token.end - token.start), token.start);
