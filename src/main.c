@@ -37,7 +37,7 @@ struct {
   char const *start;
   char const *end;
   union {
-    u64 int_value;
+    i64 int_value;
   };
 } typedef t_token;
 
@@ -95,6 +95,81 @@ static void state_parse_next_token(t_lexstate *state) {
   state->last_token.end = end;
 }
 
+static inline bool token_is(t_lexstate *state, t_token_kind kind) {
+  return state->last_token.kind == kind;
+}
+
+static inline bool token_match(t_lexstate *state, t_token_kind kind) {
+  if(state->last_token.kind == kind) {
+    state_parse_next_token(state);
+    return true;
+  }
+  return false;
+}
+
+// what about --3?
+
+//
+// expr3 = val | '(' val ')'
+// expr2 = expr3 | -expr3
+// expr1 = expr2 [('*'|'/') expr2 ...]
+// expr0 = expr1 [('+'|'-') expr1 ...]
+// expr  = expr2
+//
+
+static i64 parse_expr(t_lexstate *state);
+
+static i64 parse_expr3(t_lexstate *state) {
+  if(token_match(state, TOKEN_INT)) {
+    return state->last_token.int_value;
+  }
+  else if(token_match(state, '(')) {
+    i64 res = parse_expr(state);
+    if(false == token_match(state, ')')) {
+      printf("fatal: unmatched parenthesis\n");
+      // panic
+    }
+    return res;
+  }
+  else {
+    printf("fatal: unexpected token\n");
+    return 0;
+  }
+}
+
+static i64 parse_expr2(t_lexstate *state) {
+  if(token_match(state, '-')) return -parse_expr3(state); 
+  else return parse_expr3(state);
+}
+
+static i64 parse_expr1(t_lexstate *state) {
+  i64 val = parse_expr2(state);
+  while(token_is(state, '*') || token_is(state, '/')) {
+    char op = state->last_token.kind;
+    state_parse_next_token(state);
+    i64 rval = parse_expr2(state);
+    if(op == '*') val *= rval;
+    if(op == '/') val /= rval;
+  }
+  return val;
+}
+
+static i64 parse_expr0(t_lexstate *state) {
+  i64 val = parse_expr1(state);
+  while(token_is(state, '+') || token_is(state, '-')) {
+    char op = state->last_token.kind;
+    state_parse_next_token(state);
+    i64 rval = parse_expr1(state);
+    if(op == '+') val += rval;
+    if(op == '-') val -= rval;
+  }
+  return val;
+}
+
+static i64 parse_expr(t_lexstate *state) {
+  return parse_expr0(state);
+}
+
 static void token_print(t_token token) {
   if(token.kind < 128 && isprint(token.kind)) {
     printf("'%c'", token.kind);
@@ -113,33 +188,41 @@ static void token_print(t_token token) {
   }
 }
 
-#include<stdio.h>
-#include"memory.c"
-int main(void) {
+static u64 test_parse_expression(char const *expression) {
+  t_lexstate state;
+  state_init(&state, expression);
+  state_parse_next_token(&state);
+  u64 result = parse_expr(&state);
+  printf("%d\n", result);
+  return result;
+}
+
+#define test(e) assert((e) == test_parse_expression(#e))
+static void test_parsing(void) {
+  test(1);
+  test((1));
+  test(-1);
+  test(2+(2*2));
+  test(2*-2+2);
+}
+#undef test
+
+static void test_lexing(void) {
   char const *string = "+()abndk*18888__as2(2)*&";
   t_lexstate state;
   state_init(&state, string);
-  
-  u64 tokens_count = 0;
-  t_stack tokens;
-  ptr size = 10*kb;
-  stack_init(&tokens, size, malloc(size), sizeof(t_token), 0x100);
-  
   do {
     state_parse_next_token(&state);
-    
-    t_token *next_token = stack_push(&tokens);
-    *next_token = state.last_token;
-    tokens_count += 1;
-    
-    token_print(next_token[0]);
-    printf("\t\t%p\n", next_token);
-  } while(state.last_token.kind != 0);
-  
-  for(u64 i = 0; i < tokens_count; i += 1) {
-    
-    printf(" ");
-  }
+    token_print(state.last_token);
+  } while(state.last_token.kind != TOKEN_EOF);
+  printf("\n\n");
+}
+
+#include<stdio.h>
+#include"memory.c"
+int main(void) {
+  test_lexing();
+  test_parsing();
   
   return 0;
 }
