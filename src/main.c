@@ -33,13 +33,18 @@ void panicf(char *message, ...) {
   exit(1);
 }
 
-static char const *last_error;
-void set_error(char const *message) {
-  last_error = message;
+static bool error = false;
+static char last_error[1024];
+void set_errorf(char const *message, ...) {
+  va_list args;
+  va_start(args, message);
+  vsprintf(last_error, message, args);
+  va_end(args);
+  error = true;
 }
 
 void reset_error(void) {
-  last_error = null;
+  last_error[0] = 0;
 }
 
 enum {
@@ -117,6 +122,17 @@ static void state_parse_next_token(t_lexstate *state) {
     break;
   }
 }
+
+static char *get_nonchar_token_kind_name(t_token_kind kind) {
+  if(kind == TOKEN_INT) {
+    return "INT";
+  }
+  else if(kind == TOKEN_IDN) {
+    return "NAME";
+  }
+  return "{unknown token}";
+}
+
 static inline bool token_is(t_lexstate *state, t_token_kind kind) {
   return state->last_token.kind == kind;
 }
@@ -148,12 +164,13 @@ static i64 parse_expr3(t_lexstate *state) {
   else if(token_match(state, '(')) {
     i64 res = parse_expr0(state);
     if(false == token_match(state, ')')) {
-      set_error("fatal: unmatched parenthesis");
+      set_errorf("fatal: unmatched parenthesis");
     }
     return res;
   }
   else {
-    set_error("fatal: unexpected token");
+    set_errorf("fatal: unexpected token %s, expected INT or '('", 
+               get_nonchar_token_kind_name(state->last_token.kind));
   }
   return 0;
 }
@@ -172,7 +189,8 @@ static i64 parse_expr1(t_lexstate *state) {
     if(op == '*') val *= rval;
     if(op == '/') {
       if (rval == 0) {
-        set_error("error division by zero");
+        set_errorf("error: division by zero");
+        return 0;
       }
       val /= rval;
     }
@@ -195,7 +213,7 @@ static i64 parse_expr0(t_lexstate *state) {
 static i64 parse_expr(t_lexstate *state) {
   i64 result = parse_expr0(state);
   if(state->last_token.kind != TOKEN_EOF) {
-    set_error("not an expression!\n");
+    set_errorf("not an expression!\n");
   }
   return result;
 }
@@ -207,17 +225,17 @@ int main(void) {
   test_lexing();
   test_parsing();
   
-  last_error = null;
+  error = false;
   while(true) {
     char buf[256];
     printf("x-shell$ "); fgets(buf, sizeof buf, stdin);
     u64 result = test_parse_expression(buf);
-    if(last_error == null) {
+    if(error == false) {
       printf("%lld\n", result);
     }
     else {
       printf("error: %s\n", last_error);
-      last_error = null;
+      error = false;
     }
   }
   
