@@ -313,11 +313,13 @@ static i64 parse_expr(t_lexstate *state) {
 }
 
 #include<stdio.h>
-#include"test.c"
 #include"memory.c"
+#include"vm.c"
+#include"test.c"
 int main(void) {
   test_lexing();
   test_parsing();
+  test_vm();
   
   error = false;
   while(true) {
