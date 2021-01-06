@@ -239,7 +239,8 @@ static inline bool token_match(t_lexstate *state, t_token_kind kind) {
   return false;
 }
 
-// what about --3?
+// what about --3? 
+// note: doesn't work
 
 //
 // expr3 = val | '(' expr0 ')'
@@ -320,6 +321,7 @@ int main(void) {
   test_lexing();
   test_parsing();
   test_vm();
+  test_vm_compiler();
   
   error = false;
   while(true) {
