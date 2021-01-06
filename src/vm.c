@@ -3,7 +3,6 @@ struct {
   ptr stack_size;
   byte *stack;
   byte *stack_ptr;
-  i64 reg;
   bool halt;
   bool error;
 } typedef t_vm;
@@ -14,7 +13,6 @@ static void vm_init(t_vm *vm, ptr stack_size, void *stack) {
   vm->stack_ptr = vm->stack + vm->stack_size;
   vm->halt = false;
   vm->error = false;
-  vm->reg = false;
 }
 
 static void vm_push_i64(t_vm *vm, i64 value) {
@@ -58,26 +56,21 @@ static void bytestream_init(t_bytestream *stream, void *mem) {
 // 01 HALT
 // 02 ERR
 // 
-// 05 ADD  REG,IMM8 (in bytes)
-// 06 ADD  REG,STK8
-// 07 SUB  REG,IMM8
-// 08 SUB  REG,STK8
-// 09 MUL  REG,IMM8
-// 0A MUL  REG,STK8
-// 0B DIV  REG,IMM8
-// 0C DIV  REG,STK8
-// 0D NEG  REG
-// 0E CLR  REG
+// 05 ADD
+// 06 SUB
+// 07 MUL
+// 08 DIV
+// 09 NEG
 //
-// 10 PUSH REG
-// 11 POP  REG
-// 12 MOV  REG,IMM8
+// 10 LIT IMM64
 static void vm_next_instruction(t_vm *vm, t_bytestream *stream) {
   if(!vm->halt) {
     byte instruction = *stream->p;
     stream->p += 1;
     switch(instruction) {
-      case 0x00: {} break;
+      case 0x00: {
+        
+      } break;
       case 0x01: {
         vm->halt = true;
       } break;
@@ -87,54 +80,38 @@ static void vm_next_instruction(t_vm *vm, t_bytestream *stream) {
       } break;
       
       case 0x05: {
-        i64 imm = *(i64*)stream->p;
-        stream->p += sizeof imm;
-        vm->reg += imm;
+        i64 arg1 = vm_pop_i64(vm);
+        i64 arg2 = vm_pop_i64(vm);
+        i64 result = arg1 + arg2;
+        vm_push_i64(vm, result);
       } break;
       case 0x06: {
-        vm->reg += vm_pop_i64(vm);
+        i64 arg1 = vm_pop_i64(vm);
+        i64 arg2 = vm_pop_i64(vm);
+        i64 result = arg1 - arg2;
+        vm_push_i64(vm, result);
       } break;
       case 0x07: {
-        i64 imm = *(i64*)stream->p;
-        stream->p += sizeof imm;
-        vm->reg -= imm;
+        i64 arg1 = vm_pop_i64(vm);
+        i64 arg2 = vm_pop_i64(vm);
+        i64 result = arg1 * arg2;
+        vm_push_i64(vm, result);
       } break;
       case 0x08: {
-        vm->reg -= vm_pop_i64(vm);
+        i64 arg1 = vm_pop_i64(vm);
+        i64 arg2 = vm_pop_i64(vm);
+        i64 result = arg1 / arg2;
+        vm_push_i64(vm, result);
       } break;
       case 0x09: {
-        i64 imm = *(i64*)stream->p;
-        stream->p += sizeof imm;
-        vm->reg *= imm;
+        i64 arg1 = vm_pop_i64(vm);
+        i64 result = -arg1;
+        vm_push_i64(vm, result);
       } break;
-      case 0x0A: {
-        vm->reg *= vm_pop_i64(vm);
-      } break;
-      case 0x0B: {
-        i64 imm = *(i64*)stream->p;
-        stream->p += sizeof imm;
-        vm->reg /= imm;
-      } break;
-      case 0x0C: {
-        vm->reg /= vm_pop_i64(vm);
-      } break;
-      case 0x0D: {
-        vm->reg = -vm->reg;
-      } break;
-      case 0x0E: {
-        vm->reg = 0;
-      } break;
-      
       case 0x10: {
-        vm_push_i64(vm, vm->reg);
-      } break;
-      case 0x11: {
-        vm->reg = vm_pop_i64(vm);
-      } break;
-      case 0x12: {
         i64 imm = *(i64*)stream->p;
         stream->p += sizeof imm;
-        vm->reg = imm;
+        vm_push_i64(vm, imm);
       } break;
     }
   }
