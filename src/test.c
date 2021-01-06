@@ -43,6 +43,7 @@ static i64 test_parse_expression(char const *expression) {
   state_init(&state, expression);
   state_parse_next_token(&state);
   i64 result = parse_expr(&state);
+  check_errors();
   return result;
 }
 
@@ -53,8 +54,9 @@ static void test_parsing(void) {
   test(-1);
   test(2+(2*2));
   test(2*-2+2);
-  test_parse_expression("2a");
-  test_parse_expression("a");
+  //test_parse_expression("2a");
+  //test_parse_expression("a");
+  check_errors();
 }
 #undef test
 
@@ -64,7 +66,6 @@ static void test_vm(void) {
   vm_init(&vm, size, malloc(size));
   
   byte code[] = {
-    0x00,                                          // NOP
     0x10, 0x69,0x00,0x00,0x00,0x00,0x00,0x00,0x00, // LIT 69
     0x10, 0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00, // LIT 3
     0x05,                                          // ADD 
@@ -72,16 +73,19 @@ static void test_vm(void) {
     0x07,                                          // MUL
     0x10, 0x05,0x00,0x00,0x00,0x00,0x00,0x00,0x00, // LIT 7
     0x08,                                          // DIV
-    0x01,                                          // HLT
+    0x00,                                          // HLT
   };
-  vm_execute_code(&vm, code);
+  vm_execute_code(&vm, sizeof code, code);
+  check_errors();
 }
 
 static i64 test_vm_compile_code(t_vm *vm, char *expr) {
   vm_reset(vm);
-  byte *bytecode = compile_for_vm(expr);
-  vm_execute_code(vm, bytecode);
+  ptr bytecode_size;
+  byte *bytecode = compile_for_vm(expr, &bytecode_size);
+  vm_execute_code(vm, bytecode_size, bytecode);
   i64 result = vm_pop_i64(vm);
+  check_errors();
   return result;
 }
 

@@ -52,21 +52,70 @@ static i64 vm_pop_i64(t_vm *vm) {
 struct {
   byte *p;
   byte *off;
+  ptr size;
   byte *end;
   bool error;
 } typedef t_bytestream;
 
 static void bytestream_init(t_bytestream *stream, ptr size, void *mem) {
   stream->p = mem;
-  stream->end = stream->p + size;
+  stream->size = size;
   stream->off = stream->p;
+  stream->end = stream->p + stream->size;
   stream->error = false;
 }
 
+static void bytestream_push_byte(t_bytestream *stream, byte val) {
+  if(!stream->error) {
+    if(stream->off + 1 > stream->end) {
+      stream->error = true;
+      return;
+    }
+    *stream->off = val;
+    stream->off += 1;
+  }
+}
+
+static void bytestream_push_i64(t_bytestream *stream, i64 val) {
+  if(!stream->error) {
+    if(stream->off + 8 > stream->end) {
+      stream->error = true;
+      return;
+    }
+    *(i64 *)stream->off = val;
+    stream->off += 8;
+  }
+}
+
+static byte bytestream_read_byte(t_bytestream *stream) {
+  if(!stream->error) {
+    if(stream->off + 1 > stream->end) {
+      stream->error = true;
+      return 0;
+    }
+    byte result = *stream->off;
+    stream->off += 1;
+    return result;
+  }
+  return 0;
+}
+
+static byte bytestream_read_i64(t_bytestream *stream) {
+  if(!stream->error) {
+    if(stream->off + 8 > stream->end) {
+      stream->error = true;
+      return 0;
+    }
+    i64 result = *(i64 *)stream->off;
+    stream->off += 8;
+    return result;
+  }
+  return 0;
+}
+
 // intructions (codes in hex):
-// 00 NOP
-// 01 HALT
-// 02 ERR
+// 00 HLT
+// 01 ERR
 // 
 // 05 ADD
 // 06 SUB
@@ -77,16 +126,12 @@ static void bytestream_init(t_bytestream *stream, ptr size, void *mem) {
 // 10 LIT IMM64
 static void vm_next_instruction(t_vm *vm, t_bytestream *stream) {
   if(!vm->halt) {
-    byte instruction = *stream->p;
-    stream->p += 1;
+    byte instruction = bytestream_read_byte(stream);
     switch(instruction) {
       case 0x00: {
-        
-      } break;
-      case 0x01: {
         vm->halt = true;
       } break;
-      case 0x02: {
+      case 0x01: {
         vm->error = true;
         vm->halt = true;
       } break;
@@ -121,41 +166,21 @@ static void vm_next_instruction(t_vm *vm, t_bytestream *stream) {
         vm_push_i64(vm, result);
       } break;
       case 0x10: {
-        i64 imm = *(i64*)stream->p;
-        stream->p += sizeof imm;
+        i64 imm = bytestream_read_i64(stream);
         vm_push_i64(vm, imm);
       } break;
     }
   }
 }
 
-static void vm_execute_code(t_vm *vm, byte *code) {
+static void vm_execute_code(t_vm *vm, ptr code_size, byte *code) {
   t_bytestream stream;
-  bytestream_init(&stream, 0, code);
+  bytestream_init(&stream, code_size, code);
   do {
     vm_next_instruction(vm, &stream);
   } while(!vm->halt);
-}
-
-static void bytestream_push_byte(t_bytestream *stream, byte val) {
-  if(!stream->error) {
-    if(stream->off + 1 > stream->end) {
-      stream->error = true;
-      return;
-    }
-    *stream->off = val;
-    stream->off += 1;
-  }
-}
-
-static void bytestream_push_i64(t_bytestream *stream, i64 val) {
-  if(!stream->error) {
-    if(stream->off + 8 > stream->end) {
-      stream->error = true;
-      return;
-    }
-    *(i64 *)stream->off = val;
-    stream->off += 8;
+  if(vm->error) {
+    set_errorf("error executing code");
   }
 }
 
@@ -212,10 +237,13 @@ static void compile_expr(t_lexstate *state, t_bytestream *code) {
   if(state->last_token.kind != TOKEN_EOF) {
     set_errorf("not an expression!\n");
   }
-  bytestream_push_byte(code, 0x01); // HLT opcode
+  bytestream_push_byte(code, 0x00); // HLT opcode
+  if(code->error) {
+    set_errorf("not enough memory to compile\n");
+  }
 }
 
-byte *compile_for_vm(char *expression) {
+byte *compile_for_vm(char *expression, ptr *bytecode_size) {
   byte *result = malloc(1024);
   {
     t_lexstate state;
@@ -224,6 +252,7 @@ byte *compile_for_vm(char *expression) {
     t_bytestream stream;
     bytestream_init(&stream, 1024, result);
     compile_expr(&state, &stream);
+    *bytecode_size = stream.size;
   }
   return result;
 }

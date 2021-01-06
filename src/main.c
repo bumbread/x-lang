@@ -43,8 +43,11 @@ void set_errorf(char const *message, ...) {
   error = true;
 }
 
-void reset_error(void) {
-  last_error[0] = 0;
+void check_errors(void) {
+  if(error == true) {
+    printf("error: %s\n", last_error);
+    error = false;
+  }
 }
 
 enum {
