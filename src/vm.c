@@ -66,25 +66,27 @@ static void bytestream_init(t_bytestream *stream, ptr size, void *mem) {
 }
 
 static void bytestream_push_byte(t_bytestream *stream, byte val) {
-  if(!stream->error) {
-    if(stream->off + 1 > stream->end) {
-      stream->error = true;
-      return;
-    }
-    *stream->off = val;
-    stream->off += 1;
+  if(stream->off + 1 > stream->end) {
+    ptr prev_offset = (ptr)(stream->off - stream->p);
+    stream->size *= 2;
+    stream->p = realloc(stream->p, stream->size);
+    stream->off = stream->p + prev_offset;
+    stream->end = stream->p + stream->size;
   }
+  *stream->off = val;
+  stream->off += 1;
 }
 
 static void bytestream_push_i64(t_bytestream *stream, i64 val) {
-  if(!stream->error) {
-    if(stream->off + 8 > stream->end) {
-      stream->error = true;
-      return;
-    }
-    *(i64 *)stream->off = val;
-    stream->off += 8;
+  if(stream->off + 8 > stream->end) {
+    ptr prev_offset = (ptr)(stream->off - stream->p);
+    stream->size *= 2;
+    stream->p = realloc(stream->p, stream->size);
+    stream->off = stream->p + prev_offset;
+    stream->end = stream->p + stream->size;
   }
+  *(i64 *)stream->off = val;
+  stream->off += 8;
 }
 
 static byte bytestream_read_byte(t_bytestream *stream) {

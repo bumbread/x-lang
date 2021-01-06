@@ -326,7 +326,6 @@ int main(void) {
   test_vm();
   test_vm_compiler();
   
-  error = false;
   while(true) {
     char buf[256];
     printf("x-shell$ "); fgets(buf, sizeof buf, stdin);
