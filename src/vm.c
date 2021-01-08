@@ -240,9 +240,7 @@ static void compile_expr(t_lexstate *state, t_bytestream *code) {
     set_errorf("not an expression!\n");
   }
   bytestream_push_byte(code, 0x00); // HLT opcode
-  if(code->error) {
-    set_errorf("not enough memory to compile\n");
-  }
+  assert(!code->error);
 }
 
 byte *compile_for_vm(char *expression, ptr *bytecode_size) {
