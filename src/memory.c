@@ -122,3 +122,50 @@ static void *stack_pop(t_stack *stack) {
 static void stack_free_all(t_stack *stack) {
   stack->alloc_size = ptr_get_alignment_offset((ptr)stack->buffer, stack->align);
 }
+
+struct t_pool_header_ {struct t_pool_header_ *prev;} typedef t_pool_header;
+struct {
+  byte *buffer;
+  ptr buffer_size;
+  ptr element_size;
+  ptr align;
+  t_pool_header *hdr;
+} typedef t_pool;
+
+static void pool_free_all(t_pool *pool) {
+  ptr element_count = pool->buffer_size / pool->element_size;
+  for(ptr i = 0; i < element_count; i += 1) {
+    t_pool_header *hdr = (t_pool_header *)(pool->buffer + i*pool->element_size);
+    hdr->prev = pool->hdr;
+    pool->hdr = hdr;
+  }
+}
+
+static void pool_init(t_pool *pool, ptr buffer_size, void *buffer, ptr element_size, ptr align) {
+  ptr offset = ptr_get_alignment_offset((ptr)buffer, align);
+  assert(buffer_size >= offset);
+  
+  pool->buffer = (byte *)buffer + offset;
+  pool->buffer_size = buffer_size - offset;
+  element_size = ptr_align(element_size, align);
+  
+  pool->element_size = element_size;
+  pool->align = align;
+  pool->hdr = null;
+  pool_free_all(pool);
+}
+
+static void *pool_alloc(t_pool *pool) {
+  void *result = pool->hdr;
+  if(pool->hdr != null) pool->hdr = pool->hdr->prev;
+  return result;
+}
+
+static void pool_free(t_pool *pool, void *p) {
+  assert(p >= pool->buffer && p < pool->buffer + pool->buffer_size);
+  t_pool_header *new_hdr = (t_pool_header *)p;
+  new_hdr->prev = pool->hdr;
+  pool->hdr = new_hdr;
+}
+
+
