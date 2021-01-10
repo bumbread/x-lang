@@ -54,11 +54,6 @@ static void state_init(t_lexstate *state, char const *stream) {
 }
 
 static inline void state_next_char(t_lexstate *state) {
-  if(*state->stream == '\n') {
-    state->line += 1;
-    state->offset = 0;
-  }
-  state->offset += 1;
   state->stream += 1;
 }
 
@@ -70,9 +65,41 @@ static inline bool state_match_char(t_lexstate *state, char c) {
   return false;
 }
 
+static u64 char_to_digit[256] = {
+  ['0'] = 0,
+  ['1'] = 1,
+  ['2'] = 2,
+  ['3'] = 3,
+  ['4'] = 4,
+  ['5'] = 5,
+  ['6'] = 6,
+  ['7'] = 7,
+  ['8'] = 8,
+  ['9'] = 9,
+  ['a'] = 10,['A'] = 10,
+  ['b'] = 11,['B'] = 11,
+  ['c'] = 12,['C'] = 12,
+  ['d'] = 13,['D'] = 13,
+  ['e'] = 14,['E'] = 14,
+  ['f'] = 15,['F'] = 15,
+};
+
+static u64 parse_integer(u64 base, char const *stream, char const **end) {
+  u64 value = 0;
+  u64 digit;
+  while((digit = char_to_digit[*stream]) && (digit != 0 || *stream == '0')) {
+    value = base*value + digit;
+  }
+  *end = stream;
+  return value;
+}
+
 static void state_parse_next_token(t_lexstate *state) {
+  while(isspace(*state->stream)) {
+    state_next_char(state);
+    continue;
+  }
   char const *start = state->stream;
-  
   while(true) {
     if(isalpha(*state->stream) || *state->stream == '_') {
       state->last_token.kind = TOKEN_IDN;
@@ -80,25 +107,28 @@ static void state_parse_next_token(t_lexstate *state) {
         state_next_char(state);
       }
     }
-    else if(isdigit(*state->stream)) { // integer value
-      u64 value = 0;
-      while(isdigit(*state->stream)) {
-        value = 10*value + (*state->stream - '0');
-        state_next_char(state);
-      }
-      if(*state->stream != '.') {
-        state->last_token.int_value = value;
+    else if(isdigit(*state->stream)) {
+      while(isdigit(*state->stream)) state->stream+=1;
+      
+      if(*state->stream != '.') { //integer value
+        state->stream = start;
+        
+        u64 base = 10;
+        if(state->stream[0] == '0') {
+          if(state->stream[1] == 'x') base = 16;
+          else if(state->stream[1] == 'o') base = 8;
+          else if(state->stream[1] == 'b') base = 2;
+        }
+        
+        state->last_token.int_value = parse_integer(base, state->stream, &state->stream);
         state->last_token.kind = TOKEN_INT;
       }
       else { // floating point value
+        state->stream = start;
         f64 val = strtod(start, (char **)&state->stream);
         state->last_token.flt_value = val;
         state->last_token.kind = TOKEN_FLT;
       }
-    }
-    else if(isspace(*state->stream)) {
-      state_next_char(state);
-      continue;
     }
     else { // parse operators.
       //state_next_char(state);

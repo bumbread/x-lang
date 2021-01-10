@@ -39,14 +39,14 @@ static void test_lexing(void) {
   test_token_op(TOKEN_OP_REVERSE_ARROW);
   
   // integer literals
-  string = "123 0123 00 ";
+  string = " 123\n   0123 00 ";
   state_init(&state, string);
   test_token_int(123);
   test_token_int(123);
   test_token_int(0);
   
   // floating literals
-  string = "123.12 0.123 0. 12.e+12";
+  string = "123.12      0.123 0.\t\t 12.e+12";
   state_init(&state, string);
   test_token_flt(123.12);
   test_token_flt(0.123);
