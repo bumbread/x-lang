@@ -20,6 +20,9 @@ static void token_print(t_token token) {
 assert(state.last_token.kind == TOKEN_INT && state.last_token.int_value == (val))
 #define test_token_flt(val) state_parse_next_token(&state); \
 assert(state.last_token.kind == TOKEN_FLT && state.last_token.flt_value == (val))
+#define test_token_chr(val) state_parse_next_token(&state);\
+assert(state.last_token.kind == TOKEN_INT && state.last_token.subkind == TOKEN_SUBKIND_CHAR\
+&& state.last_token.int_value == (val))
 static void test_lexing(void) {
   
   // operators.
@@ -52,10 +55,19 @@ static void test_lexing(void) {
   test_token_flt(0.123);
   test_token_flt(0.);
   test_token_flt(12.e+12);
+  
+  // char literals
+  string = "  '2'      '\\n'  '\"' '\\10'";
+  state_init(&state, string);
+  test_token_chr('2');
+  test_token_chr('\n');
+  test_token_chr('"');
+  test_token_chr(0x10);
 }
 #undef test_token_op
 #undef test_token_int
 #undef test_token_flt
+#undef test_token_chr
 
 static i64 test_parse_expression(char const *expression) {
   t_lexstate state;

@@ -6,6 +6,8 @@ enum {
   TOKEN_INT = 128, // integer numbers
   TOKEN_FLT,
   TOKEN_IDN, // identifiers/names
+  TOKEN_STR,
+  
   // Operators having more than one symbol
   TOKEN_OP_LOG_OR,           // ||
   TOKEN_OP_LOG_AND,          // &&
@@ -26,8 +28,15 @@ enum {
   TOKEN_OP_REVERSE_ARROW,    // <-
 } typedef t_token_kind;
 
+enum {
+  TOKEN_SUBKIND_NONE,
+  TOKEN_SUBKIND_INT,
+  TOKEN_SUBKIND_CHAR,
+} typedef t_token_subkind;
+
 struct {
   t_token_kind kind;
+  t_token_subkind subkind;
   char const *start;
   char const *end;
   union {
@@ -37,8 +46,6 @@ struct {
 } typedef t_token;
 
 struct {
-  u64 line;
-  u64 offset;
   char const *stream;
   t_token last_token;
 } typedef t_lexstate;
@@ -49,8 +56,6 @@ static void state_init(t_lexstate *state, char const *stream) {
   eof_token.start = eof_token.end = null;
   eof_token.kind = TOKEN_EOF;
   state->last_token = eof_token;
-  state->line = 0;
-  state->offset = 0;
 }
 
 static inline void state_next_char(t_lexstate *state) {
@@ -84,11 +89,29 @@ static u64 char_to_digit[256] = {
   ['f'] = 15,['F'] = 15,
 };
 
+static u64 escape_char[256] = {
+  ['n'] = '\n',
+  ['t'] = '\t',
+  ['r'] = '\r',
+  ['a'] = '\a',
+  ['b'] = '\b',
+  ['v'] = '\v',
+  ['\\'] = '\\',
+  ['\''] = '\'',
+  ['"'] = '"',
+};
+
+static bool is_digit(u64 base, char c) {
+  u64 digit = char_to_digit[c];
+  return (digit < base) && (digit != 0 || c == '0');
+}
+
 static u64 parse_integer(u64 base, char const *stream, char const **end) {
   u64 value = 0;
   u64 digit;
-  while((digit = char_to_digit[*stream]) && (digit != 0 || *stream == '0')) {
+  while((digit = char_to_digit[*stream], digit < base) && (digit != 0 || *stream == '0')) {
     value = base*value + digit;
+    stream += 1;
   }
   *end = stream;
   return value;
@@ -97,9 +120,9 @@ static u64 parse_integer(u64 base, char const *stream, char const **end) {
 static void state_parse_next_token(t_lexstate *state) {
   while(isspace(*state->stream)) {
     state_next_char(state);
-    continue;
   }
   char const *start = state->stream;
+  state->last_token.subkind = TOKEN_SUBKIND_NONE;
   while(true) {
     if(isalpha(*state->stream) || *state->stream == '_') {
       state->last_token.kind = TOKEN_IDN;
@@ -108,11 +131,10 @@ static void state_parse_next_token(t_lexstate *state) {
       }
     }
     else if(isdigit(*state->stream)) {
-      while(isdigit(*state->stream)) state->stream+=1;
       
+      while(isdigit(*state->stream)) state->stream+=1;
       if(*state->stream != '.') { //integer value
         state->stream = start;
-        
         u64 base = 10;
         if(state->stream[0] == '0') {
           if(state->stream[1] == 'x') base = 16;
@@ -124,13 +146,43 @@ static void state_parse_next_token(t_lexstate *state) {
         state->last_token.kind = TOKEN_INT;
       }
       else { // floating point value
+        
         state->stream = start;
         f64 val = strtod(start, (char **)&state->stream);
         state->last_token.flt_value = val;
         state->last_token.kind = TOKEN_FLT;
       }
     }
+    else if(state_match_char(state, '\'')) {
+      
+      u64 val;
+      if(state_match_char(state, '\\')) {
+        if(is_digit(16, *state->stream)) {
+          val = parse_integer(16, state->stream, &state->stream);
+          if(val > 0xff) {
+            set_errorf("value %x is unacceptable for a char literal", val);
+          }
+        }
+        else {
+          val = escape_char[*state->stream++];
+        }
+      }
+      else if(isprint(*state->stream)) {
+        val = *state->stream;
+        state->stream += 1;
+      }
+      else {
+        set_errorf("value %x is unacceptable for a char literal", *state->stream);
+      }
+      state->last_token.kind = TOKEN_INT;
+      state->last_token.subkind = TOKEN_SUBKIND_CHAR;
+      state->last_token.int_value = val;
+      if(!state_match_char(state, '\'')) {
+        set_errorf("expected a char literal to close");
+      }
+    }
     else { // parse operators.
+      
       //state_next_char(state);
       if(state_match_char(state, '|')) {
         if(state_match_char(state, '|')) state->last_token.kind = TOKEN_OP_LOG_OR;
