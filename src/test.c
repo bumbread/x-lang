@@ -15,17 +15,47 @@ static void token_print(t_token token) {
   }
 }
 
+#define test_token_op(op)  state_parse_next_token(&state); assert(state.last_token.kind == (op))
+#define test_token_int(val) state_parse_next_token(&state); \
+assert(state.last_token.kind == TOKEN_INT && state.last_token.int_value == (val))
+#define test_token_flt(val) state_parse_next_token(&state); \
+assert(state.last_token.kind == TOKEN_FLT && state.last_token.flt_value == (val))
 static void test_lexing(void) {
-  //char const *string = "+(!=+>>&& == 2)abndk*<<<18888__as2(2)*&";
-  char const *string = ">> << >>= <<= >>> <<< >>>= <<<=";
+  
+  // operators.
   t_lexstate state;
+  char const *string = "> < >> << >>= <<= >>> <<< >>>= <<<= <-";
   state_init(&state, string);
-  do {
-    state_parse_next_token(&state);
-    token_print(state.last_token);
-  } while(state.last_token.kind != TOKEN_EOF);
-  printf("\n\n");
+  test_token_op('>');
+  test_token_op('<');
+  test_token_op(TOKEN_OP_LSHIFTR);
+  test_token_op(TOKEN_OP_LSHIFTL);
+  test_token_op(TOKEN_OP_LSHIFTR_ASSIGN);
+  test_token_op(TOKEN_OP_LSHIFTL_ASSIGN);
+  test_token_op(TOKEN_OP_ASHIFTR);
+  test_token_op(TOKEN_OP_ASHIFTL);
+  test_token_op(TOKEN_OP_ASHIFTR_ASSIGN);
+  test_token_op(TOKEN_OP_ASHIFTL_ASSIGN);
+  test_token_op(TOKEN_OP_REVERSE_ARROW);
+  
+  // integer literals
+  string = "123 0123 00 ";
+  state_init(&state, string);
+  test_token_int(123);
+  test_token_int(123);
+  test_token_int(0);
+  
+  // floating literals
+  string = "123.12 0.123 0. 12.e+12";
+  state_init(&state, string);
+  test_token_flt(123.12);
+  test_token_flt(0.123);
+  test_token_flt(0.);
+  test_token_flt(12.e+12);
 }
+#undef test_token_op
+#undef test_token_int
+#undef test_token_flt
 
 static i64 test_parse_expression(char const *expression) {
   t_lexstate state;

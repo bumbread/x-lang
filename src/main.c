@@ -139,9 +139,11 @@ static i64 parse_expr(t_lexstate *state) {
 }
 
 #include<stdio.h>
+//#include"string.c"
 #include"memory.c"
 #include"vm.c"
 #include"test.c"
+
 int main(void) {
   test_lexing();
   test_parsing();
