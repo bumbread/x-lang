@@ -168,4 +168,3 @@ static void pool_free(t_pool *pool, void *p) {
   pool->hdr = new_hdr;
 }
 
-

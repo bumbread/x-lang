@@ -135,3 +135,14 @@ static void test_vm_compiler(void) {
   test(2*-1);
 }
 #undef test
+
+static void test_interns(void) {
+  init_interns(malloc);
+  t_intern const *str_1 = intern_cstring("hello");
+  t_intern const *str_2 = intern_cstring("hello");
+  t_intern const *str_3 = intern_cstring("hellow");
+  assert(interns_equal(str_1, str_2));
+  assert(interns_equal(str_2, str_2));
+  assert(interns_equal(str_2, str_3) == false);
+  assert(interns_equal(str_1, str_3) == false);
+}
