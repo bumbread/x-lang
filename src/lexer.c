@@ -42,6 +42,7 @@ struct {
   union {
     i64 int_value;
     f64 flt_value;
+    t_intern const *str_value;
   };
 } typedef t_token;
 
@@ -58,8 +59,8 @@ static void state_init(t_lexstate *state, char const *stream) {
   state->last_token = eof_token;
 }
 
-static inline void state_next_char(t_lexstate *state) {
-  state->stream += 1;
+static inline char const state_next_char(t_lexstate *state) {
+  return *state->stream++;
 }
 
 static inline bool state_match_char(t_lexstate *state, char c) {
@@ -153,7 +154,7 @@ static void state_parse_next_token(t_lexstate *state) {
         state->last_token.kind = TOKEN_FLT;
       }
     }
-    else if(state_match_char(state, '\'')) {
+    else if(state_match_char(state, '\'')) { // character literal
       
       u64 val;
       if(state_match_char(state, '\\')) {
@@ -180,6 +181,33 @@ static void state_parse_next_token(t_lexstate *state) {
       if(!state_match_char(state, '\'')) {
         set_errorf("expected a char literal to close");
       }
+    }
+    else if(state_match_char(state, '"')) { // string literal
+      string_builder_start();
+      while(true) {
+        //char c = state_next_char(state);
+        if(state_match_char(state, '"')) break;
+        else if(state_match_char(state, '\\')) {
+          u64 val = 0;
+          if(is_digit(16, *state->stream)) {
+            val = parse_integer(16, state->stream, &state->stream);
+            if(val > 0xff) {
+              set_errorf("value %x is unacceptable for an ASCII character", val);
+            }
+          }
+          else {
+            val = escape_char[*state->stream++];
+          }
+          string_builder_append_char(val);
+        }
+        else {
+          string_builder_append_char(*state->stream++);
+        }
+      }
+      char *result = string_builder_finish();
+      t_intern const *intern = intern_string(result, result + string_builder.len);
+      state->last_token.str_value = intern;
+      state->last_token.kind = TOKEN_STR;
     }
     else { // parse operators.
       

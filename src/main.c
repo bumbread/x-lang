@@ -1,4 +1,8 @@
+
 #include"common.c"
+#include<stdio.h>
+#include"memory.c"
+#include"string.c"
 #include"lexer.c"
 
 static inline bool token_is(t_lexstate *state, t_token_kind kind) {
@@ -87,9 +91,6 @@ static i64 parse_expr(t_lexstate *state) {
   return result;
 }
 
-#include<stdio.h>
-#include"memory.c"
-#include"string.c"
 #include"vm.c"
 #include"test.c"
 

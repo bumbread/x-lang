@@ -23,6 +23,8 @@ assert(state.last_token.kind == TOKEN_FLT && state.last_token.flt_value == (val)
 #define test_token_chr(val) state_parse_next_token(&state);\
 assert(state.last_token.kind == TOKEN_INT && state.last_token.subkind == TOKEN_SUBKIND_CHAR\
 && state.last_token.int_value == (val))
+#define test_token_str(val) intern = intern_cstring(val); state_parse_next_token(&state);\
+assert(state.last_token.kind == TOKEN_STR && intern == state.last_token.str_value);
 static void test_lexing(void) {
   
   // operators.
@@ -63,11 +65,24 @@ static void test_lexing(void) {
   test_token_chr('\n');
   test_token_chr('"');
   test_token_chr(0x10);
+  
+  // string_literals
+  init_interns(malloc);
+  string_builder_init();
+  t_intern const *intern;
+  string = "  \"2\"      \"apappa\\naaoao\"  \"'\" \" \" \"'\\20\"";
+  state_init(&state, string);
+  test_token_str("2");
+  test_token_str("apappa\naaoao");
+  test_token_str("'");
+  test_token_str(" ");
+  test_token_str("' ");
 }
 #undef test_token_op
 #undef test_token_int
 #undef test_token_flt
 #undef test_token_chr
+#undef test_token_str
 
 static i64 test_parse_expression(char const *expression) {
   t_lexstate state;

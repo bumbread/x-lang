@@ -1,6 +1,7 @@
 #include<string.h>
 
 #define buffer_size 16*mb
+#define string_builder_cap 1024
 
 struct {
   ptr len;
@@ -75,7 +76,7 @@ static t_intern const *intern_string(char const *begin, char const *end) {
           return intern;
         }
       }
-      intern_ptr += intern->len + 1; // 0-terminator isn't included in the length
+      intern_ptr += sizeof(ptr) + intern->len + 1; // 0-terminator isn't included in the length
     }
   }
   
@@ -107,4 +108,32 @@ t_intern const *intern_cstring(char const *str) {
   char const *end = str;
   while(*end != 0) end += 1;
   return intern_string(str, end);
+}
+
+struct {
+  ptr len;
+  byte *string;
+  ptr cap;
+} typedef t_string_builder;
+
+static t_string_builder string_builder;
+
+static void string_builder_init(void) {
+  string_builder.string = malloc(string_builder_cap);
+  string_builder.cap = string_builder_cap;
+}
+
+static void *string_builder_start(void) {
+  string_builder.len = 0;
+  return string_builder.string;
+}
+
+static void string_builder_append_char(char c) {
+  string_builder.string[string_builder.len] = c;
+  string_builder.len += 1;
+}
+
+static void *string_builder_finish(void) {
+  string_builder.string[string_builder.len] = 0;
+  return string_builder.string;
 }
