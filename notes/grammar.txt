@@ -1,0 +1,97 @@
+
+Operators symbols:
+!  @  #  $  %  ^  &  *  +  -  =  |  /  ?  .
+
+Operators
+Op   Name         Type       Assoc.    Usage
+
+#    const        unary      none      types
+@    dereference  unary      right     ptrs
+$    address      unary      right     var
+^    bxor         binary     left      integers
+&    band         binary     left      integers
+|    bor          binary     left      integers
+*    mul          binary     left      numbers
++    add          binary     left      numbers
++    nop          unary      right     numbers
+-    sub          binary     left      numbers
+-    neg          unary      right     numbers
+/    div          binary     left      integers/numbers
+%    mod          binary     left      integers
+=    assign       binary     none      value to var
+.    access       binary     left      field of struct
+^=   xor-assign   binary     none      integer to var
+&=   and-assign   binary     none      integer to var
+|=   or-assign    binary     none      integer to var
+*=   mul-assign   binary     none      integer to var
++=   add-assign   binary     none      integer to var
+-=   sub-assign   binary     none      integer to var
+/=   div-assign   binary     none      integer to var
+%=   mod-assign   binary     none      integer to var
+==   cmp-equal    binary     none      values
+!=   cmp-neq      binary     none      values
+>    cmp-greater  binary     none      ordered values
+>=   cmp-geq      binary     none      ordered values
+<    cmp-less     binary     none      ordered values
+<=   cmp-leq      binary     none      ordered values
+!    not          unary      right     bools
+?    ?            ?          ?         ?
+->   left-arrow   binary     ?         ?
+<-   right-arrow  binary     ?         function declarator
+>>   r-l-shift    binary     left      integers
+<<   l-l-shift    binary     left      integers
+>>>  r-a-shift    binary     left      integers
+<<<  l-a-shift    binary     left      integers
+>>=  r-l-shift-a  binary     none      integers to var
+<<=  l-l-shift-a  binary     none      integers to var
+>>>= r-a-shift-a  binary     none      integers to var
+<<<= l-a-shift-a  binary     none      integers to var
+xor  xor          binary     left      bools
+and  and          binary     left      bools
+or   or           binary     left      bools
+
+Precedence level:
+Level 0:   .
+Level 1:   -u +u $u !u
+Level 2:   * and / % & ^ >> << >>> <<<
+Level 3:   + - |
+Level 4:   < > <= >= == !=
+Level 5:   = *= += /= -= >>= <<= >>>= <<<= &= ^= |=
+
+Expression syntax:
+expr0 = NAME  | '(' expr ')'
+expr1 = expr0 | ('-'|'+'|'@'|'*') expr1
+expr2 = expr1   [('*'|'/'|...) expr1]*
+expr3 = expr2   [('+'|'-'|...) expr2]*
+expr4 = expr3   [('>'|'<'|...) expr3]*
+expr  = expr4   [('='|'+='|..) expr4]*
+
+Nice.
+
+Declaration syntax:
+
+enum-item     = NAME ['=' expr]? ';'
+enum-items    = enum-item (enum-items)?
+enum-decl     = '{' enum-items '}'
+
+struct-field  = type-spec declarator? ';'
+struct-fields = struct-field (struct-fields)?
+struct-decl   = '{' struct-fields '}'
+
+union-field   = type-spec declarator? ';'
+union-fields  = union_field (union_fields)?
+union-decl    = '{' union-fields '}'
+
+func-param    = type-spec NAME
+func-params   = func-param [',' func-params]*
+func-spec     = '(' func-params ')'
+
+base-type     = 'int' 
+              | 'byte' 
+              | 'ptr' 
+              | 'struct' struct-decl 
+              | 'enum'   enum-decl
+              | 'union'  union-decl
+type-spec     = base-type [ '*' | '[' expr ']' | '<-' func-spec ]*
+declarator    = NAME ['=' ('?' | expression)] [',' declarator]
+decl          = ['type'|'alias'] type-spec declarator

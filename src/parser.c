@@ -221,6 +221,3 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
   }
 }
 
-
-
-
