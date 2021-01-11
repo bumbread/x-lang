@@ -88,13 +88,17 @@ static i64 test_parse_expression(char const *expression) {
   t_lexstate state;
   state_init(&state, expression);
   state_parse_next_token(&state);
-  i64 result = parse_expr(&state);
+  t_ast_node *expr = parse_expr(&state);
   check_errors();
-  return result;
+  return ast_node_evaluate(expr);
 }
 
 #define test(e) assert((e) == test_parse_expression(#e))
 static void test_parsing(void) {
+  ptr pool_size = 10*mb;
+  void *pool = malloc(pool_size);
+  parser_init_pool(pool_size, pool);
+  
   test(1);
   test((1));
   test(-1);

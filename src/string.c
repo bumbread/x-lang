@@ -1,6 +1,6 @@
 #include<string.h>
 
-#define buffer_size 16*mb
+#define string_buffer_size 16*mb
 #define string_builder_cap 1024
 
 struct {
@@ -19,8 +19,8 @@ static t_string_buffer *first_buffer;
 static void *(*static_allocate)(ptr size);
 
 static t_string_buffer *buffer_create_and_init(void) {
-  t_string_buffer *buffer = static_allocate(buffer_size);
-  arena_init(&buffer->arena, buffer_size, buffer);
+  t_string_buffer *buffer = static_allocate(string_buffer_size);
+  arena_init(&buffer->arena, string_buffer_size, buffer);
   void *test = arena_alloc(&buffer->arena, sizeof(t_string_buffer), 1);
   assert(test == buffer);
   buffer->string_count = 0;
@@ -56,7 +56,7 @@ static void copy_string_to_intern(t_intern *intern, ptr str_len, char const *str
 
 static t_intern const *intern_string(char const *begin, char const *end) {
   ptr string_length = (ptr)(end - begin);
-  assert(string_length < buffer_size);
+  assert(string_length < string_buffer_size);
   
   // search the string in the chain of buffers
   for(t_string_buffer *buffer = first_buffer; buffer != null; buffer = buffer->next) {

@@ -34,6 +34,40 @@ enum {
   TOKEN_SUBKIND_CHAR,
 } typedef t_token_subkind;
 
+// 1 = unary, 2 = binary, 3 = un&bin
+static char const chr_token_kinds[256] = {
+  ['!'] = 1,
+  ['#'] = 1,
+  ['$'] = 1,
+  ['%'] = 2,
+  ['&'] = 2,
+  ['*'] = 2,
+  ['+'] = 2,
+  ['-'] = 2,
+  ['/'] = 2,
+  ['.'] = 2,
+  ['>'] = 2,
+  ['<'] = 2,
+  ['?'] = 1, // subject to change
+  ['@'] = 1,
+  ['^'] = 2,
+  ['~'] = 2,
+};
+
+static bool is_token_kind_operator(t_token_kind kind) {
+  return (kind >= TOKEN_OP_LOG_OR && kind <= TOKEN_OP_REVERSE_ARROW) 
+    || ((kind < 128) && (chr_token_kinds[kind] != 0));
+}
+
+static bool is_token_kind_operator_binary(t_token_kind kind) {
+  return (kind >= TOKEN_OP_LOG_OR && kind <= TOKEN_OP_REVERSE_ARROW) 
+    || ((kind < 128) && (chr_token_kinds[kind] == 2));
+}
+
+static bool is_token_kind_operator_unary(t_token_kind kind) {
+  return (kind < 128) && (chr_token_kinds[kind] == 1);
+}
+
 struct {
   t_token_kind kind;
   t_token_subkind subkind;
@@ -122,6 +156,7 @@ static void state_parse_next_token(t_lexstate *state) {
   while(isspace(*state->stream)) {
     state_next_char(state);
   }
+  
   char const *start = state->stream;
   state->last_token.subkind = TOKEN_SUBKIND_NONE;
   while(true) {
