@@ -16,12 +16,20 @@ int main(void) {
   test_vm_compiler();
   test_interns();
   
+  t_lexstate state;
   while(true) {
-    char buf[256];
+    char buf[1024];
     printf("x-shell$ "); fgets(buf, sizeof buf, stdin);
-    u64 result = test_parse_expression(buf);
+    state_init(&state, buf);
+    
+    state_parse_next_token(&state);
+    t_ast_node *expr = parse_expr(&state);
+    check_errors();
+    ast_node_print_lisp(expr);
+    u64 result = ast_node_evaluate(expr);
+    
     if(error == false) {
-      printf("%lld\n", result);
+      printf("\nresult: %lld\n", result);
     }
     else {
       printf("error: %s\n", last_error);

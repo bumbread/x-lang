@@ -104,6 +104,8 @@ static void test_parsing(void) {
   test(-1);
   test(2+(2*2));
   test(2*-2+2);
+  test(2*2*2);
+  test(2+2+2);
   //test_parse_expression("2a");
   //test_parse_expression("a");
   check_errors();
