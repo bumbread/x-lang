@@ -25,6 +25,7 @@ u64      typedef ptr;
 #define  gb      1024*mb
 
 #include<stdarg.h>
+
 void panicf(char *message, ...) {
   va_list args;
   va_start(args, message);

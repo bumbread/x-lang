@@ -323,3 +323,8 @@ static char *get_nonchar_token_kind_name(t_token_kind kind) {
   else if(kind == 0) {return "EOF";}
   return "{unknown token}";
 }
+
+static void print_token_kind(t_token token) {
+  if(token.kind < 128) printf("%c", token.kind);
+  else printf("%s", get_nonchar_token_kind_name(token.kind));
+}

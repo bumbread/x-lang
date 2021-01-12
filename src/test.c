@@ -93,24 +93,24 @@ static i64 test_parse_expression(char const *expression) {
   return ast_node_evaluate(expr);
 }
 
-#define test(e) assert((e) == test_parse_expression(#e))
+#define test_expr(e) assert((e) == test_parse_expression(#e))
 static void test_parsing(void) {
   ptr pool_size = 10*mb;
   void *pool = malloc(pool_size);
-  parser_init_pool(pool_size, pool);
+  parser_init_memory(pool_size, pool);
   
-  test(1);
-  test((1));
-  test(-1);
-  test(2+(2*2));
-  test(2*-2+2);
-  test(2*2*2);
-  test(2+2+2);
+  test_expr(1);
+  test_expr((1));
+  test_expr(-1);
+  test_expr(2+(2*2));
+  test_expr(2*-2+2);
+  test_expr(2*2*2);
+  test_expr(2+2+2);
   //test_parse_expression("2a");
   //test_parse_expression("a");
   check_errors();
 }
-#undef test
+#undef test_expr
 
 static void test_vm(void) {
   ptr size = 10*kb;

@@ -19,43 +19,126 @@ static inline bool token_match_val(t_lexstate *state) {
   return false;
 }
 
+struct t_ast_node_ typedef t_ast_node;
 enum {
-  TYPE_WHAT,
-  TYPE_VAL,
-  TYPE_EXPR_BIN,
-  TYPE_EXPR_UNR,
+  TYPE_NONE,
+  TYPE_TYPE,
+  TYPE_EXPR,
+  TYPE_STMT,
+  TYPE_DECL,
 } typedef t_ast_node_type;
+
+enum {
+  EXPR_NONE,
+  EXPR_VALUE,
+  EXPR_UNARY,
+  EXPR_BINARY,
+} typedef t_expr_type;
+
+struct {
+  t_expr_type type;
+  union {
+    t_token value;
+    struct {
+      t_token unary_operation;
+      t_ast_node *unary_operand;
+    };
+    struct {
+      t_token binary_operation;
+      t_ast_node *binary_operand_left;
+      t_ast_node *binary_operand_right;
+    };
+  };
+} typedef t_ast_expr;
+
+enum {
+  _TYPE_NONE,
+  TYPE_INT,
+  TYPE_FLOAT,
+  TYPE_STRUCT,
+  TYPE_ENUM,
+  TYPE_UNION,
+  TYPE_POINTER,
+  TYPE_ARRAY,
+  TYPE_FUNC
+} typedef t_type_type;
+
+struct {
+  t_type_type type;
+  t_intern *name;
+  union {
+    // pointers, arrays.
+    t_ast_node *base_type;
+    // structs, unions
+    t_ast_node *declaration_list;
+    // functions
+    struct {
+      t_ast_node *return_type;
+      t_ast_node *arg_decl_list;
+    };
+  };
+} typedef t_ast_type;
+
+enum {
+  DECL_NONE,
+  DECL_VAR,
+  DECL_TYPE,
+  DECL_ALIAS,
+  DECL_STATIC,
+  DECL_EXTERN,
+} typedef t_decl_type;
+
+struct {
+  t_decl_type type;
+  t_ast_node *decl_type;
+  t_intern *name;
+  t_ast_node *default_value;
+} typedef t_ast_decl;
+
+enum {
+  STMT_NONE,
+  STMT_IF,
+  STMT_WHILE,
+  STMT_BREAK,
+  STMT_RETURN,
+  STMT_YIELD,
+} typedef t_stmt_type;
+
+struct {
+  t_stmt_type type;
+  t_ast_node *next;
+  union {
+    // if, else if, while
+    struct {
+      t_ast_node *condition;
+      t_ast_node *block;
+      t_ast_node *else_stmt;
+    };
+    // return, yield
+    struct {
+      t_ast_node *value;
+    };
+  };
+} typedef t_ast_stmt;
 
 struct t_ast_node_ {
   t_ast_node_type type;
-  struct {
-    // singular values
-    struct {
-      t_token value;
-    };
-    // unary expression
-    struct {
-      t_token unary_op;
-      struct t_ast_node_ *unary_val;
-    };
-    // binary expression
-    struct {
-      struct t_ast_node_ *binary_lv;
-      t_token binary_op;
-      struct t_ast_node_ *binary_rv;
-    };
-    // compond statement
-    struct {
-      ptr statement_count;
-      struct t_ast_node_ *statements;
-    };
+  union {
+    t_ast_expr expr;
+    t_ast_decl decl;
+    t_ast_type asttype;
+    t_ast_stmt stmt;
   };
-} typedef t_ast_node;
+};
 
-static t_pool ast_node_pool;
+static t_arena ast_arena;
 
-static void parser_init_pool(ptr buffer_size, void *buffer) {
-  pool_init(&ast_node_pool, buffer_size, buffer, sizeof(t_ast_node), 8);
+static void parser_init_memory(ptr buffer_size, void *buffer) {
+  arena_init(&ast_arena, buffer_size, buffer);
+}
+
+static t_ast_node *allocate_node(void) {
+  return arena_alloc(&ast_arena, sizeof(t_ast_node), 8);
 }
 
 //
@@ -77,11 +160,12 @@ static t_ast_node *parse_expr3(t_lexstate *state) {
     return expr0;
   }
   else {
-    t_ast_node *val_node = pool_alloc(&ast_node_pool);
-    val_node->value = state->last_token;
-    val_node->type = TYPE_VAL;
+    t_ast_node *node = allocate_node();
+    node->type = TYPE_EXPR;
+    node->expr.type = EXPR_VALUE;
+    node->expr.value = state->last_token;
     state_parse_next_token(state);
-    return val_node;
+    return node;
   }
   
   return null;
@@ -90,11 +174,12 @@ static t_ast_node *parse_expr3(t_lexstate *state) {
 static t_ast_node *parse_expr2(t_lexstate *state) {
   t_token op_token = state->last_token;
   if(token_match(state, '-')) {
-    t_ast_node *min_op = pool_alloc(&ast_node_pool);
-    min_op->type = TYPE_EXPR_UNR;
-    min_op->unary_op = op_token;
-    min_op->unary_val = parse_expr3(state);
-    return min_op;
+    t_ast_node *node = allocate_node();
+    node->type = TYPE_EXPR;
+    node->expr.type = EXPR_UNARY;
+    node->expr.unary_operation = op_token;
+    node->expr.unary_operand = parse_expr3(state);
+    return node;
   }
   else {
     return parse_expr3(state);
@@ -102,35 +187,39 @@ static t_ast_node *parse_expr2(t_lexstate *state) {
 }
 
 static t_ast_node *parse_expr1(t_lexstate *state) {
-  t_ast_node *lv = parse_expr2(state);
+  t_ast_node *operand_left = parse_expr2(state);
   while(token_is(state, '*') || token_is(state, '/')) {
     t_token op_token = state->last_token;
     state_parse_next_token(state);
-    t_ast_node *rv = parse_expr2(state);
-    t_ast_node *mul_op = pool_alloc(&ast_node_pool);
-    mul_op->type = TYPE_EXPR_BIN;
-    mul_op->binary_lv = lv;
-    mul_op->binary_op = op_token;
-    mul_op->binary_rv = rv;
-    lv = mul_op;
+    t_ast_node *operand_right = parse_expr2(state);
+    
+    t_ast_node *node = allocate_node();
+    node->type = TYPE_EXPR;
+    node->expr.type = EXPR_BINARY;
+    node->expr.binary_operation = op_token;
+    node->expr.binary_operand_left = operand_left;
+    node->expr.binary_operand_right = operand_right;
+    operand_left = node;
   }
-  return lv;
+  return operand_left;
 }
 
 static t_ast_node *parse_expr0(t_lexstate *state) {
-  t_ast_node *lv = parse_expr1(state);
+  t_ast_node *operand_left = parse_expr1(state);
   while(token_is(state, '+') || token_is(state, '-')) {
     t_token op_token = state->last_token;
     state_parse_next_token(state);
-    t_ast_node *rv = parse_expr1(state);
-    t_ast_node *add_op = pool_alloc(&ast_node_pool);
-    add_op->type = TYPE_EXPR_BIN;
-    add_op->binary_lv = lv;
-    add_op->binary_op = op_token;
-    add_op->binary_rv = rv;
-    lv = add_op;
+    t_ast_node *operand_right = parse_expr1(state);
+    
+    t_ast_node *node = allocate_node();
+    node->type = TYPE_EXPR;
+    node->expr.type = EXPR_BINARY;
+    node->expr.binary_operation = op_token;
+    node->expr.binary_operand_left = operand_left;
+    node->expr.binary_operand_right = operand_right;
+    operand_left = node;
   }
-  return lv;
+  return operand_left;
 }
 
 static t_ast_node *parse_expr(t_lexstate *state) {
@@ -160,33 +249,41 @@ static i64 ast_node_evaluate(t_ast_node *ast_node) {
     return 0;
   }
   
-  switch(ast_node->type) {
-    case TYPE_VAL: {
-      if(assert_token_type(&ast_node->value, TOKEN_INT)) {
-        return ast_node->value.int_value;
-      }
-      return 0;
-    } break;
-    case TYPE_EXPR_BIN: {
-      switch(ast_node->binary_op.kind) {
-        case '+': return ast_node_evaluate(ast_node->binary_lv) + ast_node_evaluate(ast_node->binary_rv);
-        case '-': return ast_node_evaluate(ast_node->binary_lv) - ast_node_evaluate(ast_node->binary_rv);
-        case '*': return ast_node_evaluate(ast_node->binary_lv) * ast_node_evaluate(ast_node->binary_rv);
-        case '/': {
-          i64 bottom = ast_node_evaluate(ast_node->binary_rv);
-          if(bottom == 0) {
-            set_errorf("error division by zero");
-            return 0;
-          }
-          return ast_node_evaluate(ast_node->binary_lv) / bottom;
+  if(ast_node->type == TYPE_EXPR) {
+    switch(ast_node->expr.type) {
+      case EXPR_VALUE: {
+        if(assert_token_type(&ast_node->expr.value, TOKEN_INT)) {
+          return ast_node->expr.value.int_value;
         }
-      }
-    } break;
-    case TYPE_EXPR_UNR: {
-      switch(ast_node->unary_op.kind) {
-        case '-': return -ast_node_evaluate(ast_node->unary_val);
-      }
-    } break;
+        return 0;
+      } break;
+      case EXPR_UNARY: {
+        switch(ast_node->expr.unary_operation.kind) {
+          case '-': return -ast_node_evaluate(ast_node->expr.unary_operand);
+        }
+      } break;
+      case EXPR_BINARY: {
+        switch(ast_node->expr.binary_operation.kind) {
+          case '+': return
+            ast_node_evaluate(ast_node->expr.binary_operand_left) 
+            + ast_node_evaluate(ast_node->expr.binary_operand_right);
+          case '-': return
+            ast_node_evaluate(ast_node->expr.binary_operand_left) 
+            - ast_node_evaluate(ast_node->expr.binary_operand_right);
+          case '*': return
+            ast_node_evaluate(ast_node->expr.binary_operand_left) 
+            * ast_node_evaluate(ast_node->expr.binary_operand_right);
+          case '/': {
+            i64 bottom = ast_node_evaluate(ast_node->expr.binary_operand_right);
+            if(bottom == 0) {
+              set_errorf("error division by zero");
+              return 0;
+            }
+            return ast_node_evaluate(ast_node->expr.binary_operand_left) / bottom;
+          }
+        }
+      } break;
+    }
   }
   
   set_errorf("undefined operation");
@@ -198,26 +295,63 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
     printf("()");
     return;
   }
-  switch(ast_node->type) {
-    case TYPE_VAL: {
-      if(assert_token_type(&ast_node->value, TOKEN_INT)) {
-        printf(" %llu ", ast_node->value.int_value);
-      }
-    } break;
-    case TYPE_EXPR_BIN: {
-      if(ast_node->binary_op.kind < 128) printf("(%c", ast_node->binary_op.kind);
-      else printf("(%s", get_nonchar_token_kind_name(ast_node->binary_op.kind));
-      ast_node_print_lisp(ast_node->binary_lv);
-      ast_node_print_lisp(ast_node->binary_rv);
-      printf(")");
-    } break;
-    case TYPE_EXPR_UNR: {
-      if(ast_node->binary_op.kind < 128) printf("(%c", ast_node->binary_op.kind);
-      else printf("(%s", get_nonchar_token_kind_name(ast_node->binary_op.kind));
-      ast_node_print_lisp(ast_node->unary_val);
-      printf(")");
-    } break;
-    default: set_errorf("undefined operation");
+  if(ast_node->type == TYPE_EXPR) {
+    switch(ast_node->expr.type) {
+      case EXPR_VALUE: {
+        if(assert_token_type(&ast_node->expr.value, TOKEN_INT)) {
+          printf(" %llu ", ast_node->expr.value.int_value);
+        }
+      } break;
+      case EXPR_UNARY: {
+        printf("(");
+        print_token_kind(ast_node->expr.unary_operation);
+        ast_node_print_lisp(ast_node->expr.unary_operand);
+        printf(")");
+      } break;
+      case EXPR_BINARY: {
+        printf("(");
+        print_token_kind(ast_node->expr.binary_operation);
+        ast_node_print_lisp(ast_node->expr.binary_operand_left);
+        ast_node_print_lisp(ast_node->expr.binary_operand_right);
+        printf(")");
+      } break;
+      default: set_errorf("undefined operation");
+    }
+  }
+  else if(ast_node->type == TYPE_STMT) {
+    switch(ast_node->stmt.type) {
+      case STMT_IF: {
+        printf("(if ");
+        ast_node_print_lisp(ast_node->stmt.condition);
+        ast_node_print_lisp(ast_node->stmt.block);
+        if(ast_node->stmt.else_stmt) {
+          ast_node_print_lisp(ast_node->stmt.else_stmt);
+        }
+        else {
+          printf("<none>");
+        }
+        printf(")");
+      } break;
+      case STMT_WHILE: {
+        printf("(while ");
+        ast_node_print_lisp(ast_node->stmt.condition);
+        ast_node_print_lisp(ast_node->stmt.block);
+        printf(")");
+      } break;
+      case STMT_BREAK: {
+        printf("break ");
+      } break;
+      case STMT_RETURN: {
+        printf("(return ");
+        ast_node_print_lisp(ast_node->stmt.value);
+        printf(")");;
+      } break;
+      case STMT_YIELD: {
+        printf("(yield ");
+        ast_node_print_lisp(ast_node->stmt.value);
+        printf(")");
+      } break;
+    }
   }
 }
 

@@ -5,6 +5,7 @@ Operators symbols:
 Operators
 Op   Name         Type       Assoc.    Usage
 
+:    ?            ?          ?         ?
 #    const        unary      none      types
 @    dereference  unary      right     ptrs
 $    address      unary      right     var
@@ -51,47 +52,10 @@ and  and          binary     left      bools
 or   or           binary     left      bools
 
 Precedence level:
-Level 0:   .
-Level 1:   -u +u $u !u
-Level 2:   * and / % & ^ >> << >>> <<<
-Level 3:   + - |
-Level 4:   < > <= >= == !=
-Level 5:   = *= += /= -= >>= <<= >>>= <<<= &= ^= |=
-
-Expression syntax:
-expr0 = NAME  | '(' expr ')'
-expr1 = expr0 | ('-'|'+'|'@'|'*') expr1
-expr2 = expr1   [('*'|'/'|...) expr1]*
-expr3 = expr2   [('+'|'-'|...) expr2]*
-expr4 = expr3   [('>'|'<'|...) expr3]*
-expr  = expr4   [('='|'+='|..) expr4]*
-
-Nice.
-
-Declaration syntax:
-
-enum-item     = NAME ['=' expr]? ';'
-enum-items    = enum-item (enum-items)?
-enum-decl     = '{' enum-items '}'
-
-struct-field  = type-spec declarator? ';'
-struct-fields = struct-field (struct-fields)?
-struct-decl   = '{' struct-fields '}'
-
-union-field   = type-spec declarator? ';'
-union-fields  = union_field (union_fields)?
-union-decl    = '{' union-fields '}'
-
-func-param    = type-spec NAME
-func-params   = func-param [',' func-params]*
-func-spec     = '(' func-params ')'
-
-base-type     = 'int' 
-              | 'byte' 
-              | 'ptr' 
-              | 'struct' struct-decl 
-              | 'enum'   enum-decl
-              | 'union'  union-decl
-type-spec     = base-type [ '*' | '[' expr ']' | '<-' func-spec ]*
-declarator    = NAME ['=' ('?' | expression)] [',' declarator]
-decl          = ['type'|'alias'] type-spec declarator
+Level 1: unr-op =   - + $ !
+Level 2: mul-op =   * / % & ^ >> << >>> <<<
+Level 3: add-op =   + - | 
+Level 4: cmp-op =   < > <= >= == !=
+Level 5:            and
+Level 6:            or
+Level 7: ass-op =   = *= += /= -= >>= <<= >>>= <<<= &= ^= |=
