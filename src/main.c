@@ -1,4 +1,13 @@
 
+#define _CRT_SECURE_NO_WARNINGS
+#include<stdio.h>
+#include<stdarg.h>
+#include<ctype.h>
+#include<assert.h>
+#include<stdlib.h>
+#include<stdint.h>
+
+
 #include"common.c"
 #include<stdio.h>
 #include"memory.c"

@@ -102,7 +102,7 @@ static byte bytestream_read_byte(t_bytestream *stream) {
   return 0;
 }
 
-static byte bytestream_read_i64(t_bytestream *stream) {
+static i64 bytestream_read_i64(t_bytestream *stream) {
   if(!stream->error) {
     if(stream->off + 8 > stream->end) {
       stream->error = true;
@@ -200,8 +200,7 @@ static void compile_expr3(t_lexstate *state, t_bytestream *code) {
     }
   }
   else {
-    set_errorf("fatal: unexpected token %s, expected INT or '('", 
-               get_nonchar_token_kind_name(state->last_token.kind));
+    set_errorf("fatal: unexpected token %s, expected VALUE or '('", get_token_kind_name(state->last_token.kind));
   }
 }
 

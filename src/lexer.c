@@ -34,40 +34,6 @@ enum {
   TOKEN_SUBKIND_CHAR,
 } typedef t_token_subkind;
 
-// 1 = unary, 2 = binary, 3 = un&bin
-static char const chr_token_kinds[256] = {
-  ['!'] = 1,
-  ['#'] = 1,
-  ['$'] = 1,
-  ['%'] = 2,
-  ['&'] = 2,
-  ['*'] = 2,
-  ['+'] = 2,
-  ['-'] = 2,
-  ['/'] = 2,
-  ['.'] = 2,
-  ['>'] = 2,
-  ['<'] = 2,
-  ['?'] = 1, // subject to change
-  ['@'] = 1,
-  ['^'] = 2,
-  ['~'] = 2,
-};
-
-static bool is_token_kind_operator(t_token_kind kind) {
-  return (kind >= TOKEN_OP_LOG_OR && kind <= TOKEN_OP_REVERSE_ARROW) 
-    || ((kind < 128) && (chr_token_kinds[kind] != 0));
-}
-
-static bool is_token_kind_operator_binary(t_token_kind kind) {
-  return (kind >= TOKEN_OP_LOG_OR && kind <= TOKEN_OP_REVERSE_ARROW) 
-    || ((kind < 128) && (chr_token_kinds[kind] == 2));
-}
-
-static bool is_token_kind_operator_unary(t_token_kind kind) {
-  return (kind < 128) && (chr_token_kinds[kind] == 1);
-}
-
 struct {
   t_token_kind kind;
   t_token_subkind subkind;
@@ -152,6 +118,22 @@ static u64 parse_integer(u64 base, char const *stream, char const **end) {
   return value;
 }
 
+static char parse_escape(char const *stream, char const **end) {
+  char val;
+  if(is_digit(16, *stream)) {
+    u64 result = parse_integer(16, stream, &stream);
+    if(result > 0xff) {
+      set_errorf("value %x is unacceptable for a char literal", result);
+    }
+    val = (char)result;
+  }
+  else {
+    val = (char)escape_char[*stream++];
+  }
+  *end = stream;
+  return val;
+}
+
 static void state_parse_next_token(t_lexstate *state) {
   while(isspace(*state->stream)) {
     state_next_char(state);
@@ -159,151 +141,154 @@ static void state_parse_next_token(t_lexstate *state) {
   
   char const *start = state->stream;
   state->last_token.subkind = TOKEN_SUBKIND_NONE;
-  while(true) {
-    if(isalpha(*state->stream) || *state->stream == '_') {
-      state->last_token.kind = TOKEN_IDN;
-      while(isalnum(*state->stream) || *state->stream == '_') {
-        state_next_char(state);
-      }
+  
+  if(isalpha(*state->stream) || *state->stream == '_') {
+    state->last_token.kind = TOKEN_IDN;
+    while(isalnum(*state->stream) || *state->stream == '_') {
+      state_next_char(state);
     }
-    else if(isdigit(*state->stream)) {
-      
-      while(isdigit(*state->stream)) state->stream+=1;
-      if(*state->stream != '.') { //integer value
-        state->stream = start;
-        u64 base = 10;
-        if(state->stream[0] == '0') {
-          if(state->stream[1] == 'x') base = 16;
-          else if(state->stream[1] == 'o') base = 8;
-          else if(state->stream[1] == 'b') base = 2;
-        }
-        
-        state->last_token.int_value = parse_integer(base, state->stream, &state->stream);
-        state->last_token.kind = TOKEN_INT;
-      }
-      else { // floating point value
-        
-        state->stream = start;
-        f64 val = strtod(start, (char **)&state->stream);
-        state->last_token.flt_value = val;
-        state->last_token.kind = TOKEN_FLT;
-      }
-    }
-    else if(state_match_char(state, '\'')) { // character literal
-      
-      u64 val;
-      if(state_match_char(state, '\\')) {
-        if(is_digit(16, *state->stream)) {
-          val = parse_integer(16, state->stream, &state->stream);
-          if(val > 0xff) {
-            set_errorf("value %x is unacceptable for a char literal", val);
-          }
-        }
-        else {
-          val = escape_char[*state->stream++];
-        }
-      }
-      else if(isprint(*state->stream)) {
-        val = *state->stream;
-        state->stream += 1;
-      }
-      else {
-        set_errorf("value %x is unacceptable for a char literal", *state->stream);
-      }
-      state->last_token.kind = TOKEN_INT;
-      state->last_token.subkind = TOKEN_SUBKIND_CHAR;
-      state->last_token.int_value = val;
-      if(!state_match_char(state, '\'')) {
-        set_errorf("expected a char literal to close");
-      }
-    }
-    else if(state_match_char(state, '"')) { // string literal
-      string_builder_start();
-      while(true) {
-        //char c = state_next_char(state);
-        if(state_match_char(state, '"')) break;
-        else if(state_match_char(state, '\\')) {
-          u64 val = 0;
-          if(is_digit(16, *state->stream)) {
-            val = parse_integer(16, state->stream, &state->stream);
-            if(val > 0xff) {
-              set_errorf("value %x is unacceptable for an ASCII character", val);
-            }
-          }
-          else {
-            val = escape_char[*state->stream++];
-          }
-          string_builder_append_char(val);
-        }
-        else {
-          string_builder_append_char(*state->stream++);
-        }
-      }
-      char *result = string_builder_finish();
-      t_intern const *intern = intern_string(result, result + string_builder.len);
-      state->last_token.str_value = intern;
-      state->last_token.kind = TOKEN_STR;
-    }
-    else { // parse operators.
-      
-      //state_next_char(state);
-      if(state_match_char(state, '|')) {
-        if(state_match_char(state, '|')) state->last_token.kind = TOKEN_OP_LOG_OR;
-        else state->last_token.kind = '|';
-      }
-      else if(state_match_char(state, '&')) {
-        if(state_match_char(state, '&')) state->last_token.kind = TOKEN_OP_LOG_AND;
-        else state->last_token.kind = '&';
-      }
-      else if(state_match_char(state, '=')) {
-        if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_EQ;
-        else if(state_match_char(state, '>')) state->last_token.kind = TOKEN_OP_BIG_ARROW;
-        else state->last_token.kind = '=';
-      }
-      else if(state_match_char(state, '>')) {
-        if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_GEQ;
-        else if(state_match_char(state, '>')) {
-          if(state_match_char(state, '>')) {
-            if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_ASHIFTR_ASSIGN;
-            else state->last_token.kind = TOKEN_OP_ASHIFTR;
-          }
-          else if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_LSHIFTR_ASSIGN;
-          else state->last_token.kind = TOKEN_OP_LSHIFTR;
-        }
-        else state->last_token.kind = '>';
-      }
-      else if(state_match_char(state, '<')) {
-        if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_LEQ;
-        else if(state_match_char(state, '-')) state->last_token.kind = TOKEN_OP_REVERSE_ARROW;
-        else if(state_match_char(state, '<')) {
-          if(state_match_char(state, '<')) {
-            if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_ASHIFTL_ASSIGN;
-            else state->last_token.kind = TOKEN_OP_ASHIFTL;
-          }
-          else if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_LSHIFTL_ASSIGN;
-          else state->last_token.kind = TOKEN_OP_LSHIFTL;
-        }
-        else state->last_token.kind = '<';
-      }
-      else if(state_match_char(state, '!')) {
-        if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_NEQ;
-        else state->last_token.kind = '!';
-      }
-      else {
-        state->last_token.kind = *state->stream;
-        state_next_char(state);
-      }
-    }
-    char const *end = state->stream;
-    state->last_token.start = start;
-    state->last_token.end = end;
-    break;
   }
+  else if(isdigit(*state->stream)) {
+    
+    // searching the '.' to find whether the number is flt
+    while(isdigit(*state->stream)) state->stream+=1;
+    if(*state->stream == '.') {
+      state->stream = start;
+      f64 val = strtod(start, (char **)&state->stream);
+      state->last_token.flt_value = val;
+      state->last_token.kind = TOKEN_FLT;
+    }
+    else {
+      state->stream = start;
+      u64 base = 10;
+      if(state->stream[0] == '0') {
+        if(tolower(state->stream[1]) == 'x') base = 16;
+        else if(tolower(state->stream[1] == 'o')) base = 8;
+        else if(tolower(state->stream[1] == 'b')) base = 2;
+      }
+      state->last_token.int_value = parse_integer(base, state->stream, &state->stream);
+      state->last_token.kind = TOKEN_INT;
+    }
+  }
+  else if(state_match_char(state, '\'')) { // character literal
+    
+    u64 val;
+    if(state_match_char(state, '\\')) {
+      val = parse_escape(state->stream, &state->stream);
+    }
+    else if(isprint(*state->stream)) {
+      val = *state->stream;
+      state->stream += 1;
+    }
+    else {
+      set_errorf("value %x is unacceptable for a char literal", *state->stream);
+    }
+    state->last_token.kind = TOKEN_INT;
+    state->last_token.subkind = TOKEN_SUBKIND_CHAR;
+    state->last_token.int_value = val;
+    if(!state_match_char(state, '\'')) {
+      set_errorf("expected a char literal to close");
+    }
+  }
+  else if(state_match_char(state, '"')) { // string literal
+    string_builder_start();
+    while(true) {
+      //char c = state_next_char(state);
+      if(state_match_char(state, '"')) break;
+      else if(state_match_char(state, '\\')) {
+        string_builder_append_char(parse_escape(state->stream, &state->stream));
+      }
+      else {
+        string_builder_append_char(*state->stream++);
+      }
+    }
+    char *result = string_builder_finish();
+    t_intern const *intern = intern_string(result, result + string_builder.len);
+    state->last_token.str_value = intern;
+    state->last_token.kind = TOKEN_STR;
+  }
+  else { // parse operators.
+    
+    //state_next_char(state);
+    if(state_match_char(state, '|')) {
+      if(state_match_char(state, '|')) state->last_token.kind = TOKEN_OP_LOG_OR;
+      else state->last_token.kind = '|';
+    }
+    else if(state_match_char(state, '&')) {
+      if(state_match_char(state, '&')) state->last_token.kind = TOKEN_OP_LOG_AND;
+      else state->last_token.kind = '&';
+    }
+    else if(state_match_char(state, '=')) {
+      if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_EQ;
+      else if(state_match_char(state, '>')) state->last_token.kind = TOKEN_OP_BIG_ARROW;
+      else state->last_token.kind = '=';
+    }
+    else if(state_match_char(state, '>')) {
+      if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_GEQ;
+      else if(state_match_char(state, '>')) {
+        if(state_match_char(state, '>')) {
+          if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_ASHIFTR_ASSIGN;
+          else state->last_token.kind = TOKEN_OP_ASHIFTR;
+        }
+        else if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_LSHIFTR_ASSIGN;
+        else state->last_token.kind = TOKEN_OP_LSHIFTR;
+      }
+      else state->last_token.kind = '>';
+    }
+    else if(state_match_char(state, '<')) {
+      if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_LEQ;
+      else if(state_match_char(state, '-')) state->last_token.kind = TOKEN_OP_REVERSE_ARROW;
+      else if(state_match_char(state, '<')) {
+        if(state_match_char(state, '<')) {
+          if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_ASHIFTL_ASSIGN;
+          else state->last_token.kind = TOKEN_OP_ASHIFTL;
+        }
+        else if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_LSHIFTL_ASSIGN;
+        else state->last_token.kind = TOKEN_OP_LSHIFTL;
+      }
+      else state->last_token.kind = '<';
+    }
+    else if(state_match_char(state, '!')) {
+      if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_NEQ;
+      else state->last_token.kind = '!';
+    }
+    else {
+      state->last_token.kind = *state->stream;
+      state_next_char(state);
+    }
+  }
+  char const *end = state->stream;
+  state->last_token.start = start;
+  state->last_token.end = end;
 }
 
-static char *get_nonchar_token_kind_name(t_token_kind kind) {
+static char *get_token_kind_name(t_token_kind kind) {
   if(kind == TOKEN_INT) {return "INT";}
   else if(kind == TOKEN_IDN) {return "NAME";}
+  else if(kind == TOKEN_FLT) {return "FLOAT";}
+  else if(kind == TOKEN_STR) {return "STRING";}
+  else if(kind == '<') {return "<";}
+  else if(kind == '>') {return ">";}
+  else if(kind == '=') {return "=";}
+  else if(kind == '!') {return "!";}
+  else if(kind == '-') {return "-";}
+  else if(kind == '+') {return "+";}
+  else if(kind == '*') {return "*";}
+  else if(kind == '/') {return "/";}
+  else if(kind == '$') {return "$";}
+  else if(kind == '#') {return "#";}
+  else if(kind == '%') {return "%";}
+  else if(kind == '^') {return "^";}
+  else if(kind == '&') {return "&";}
+  else if(kind == '|') {return "|";}
+  else if(kind == ':') {return ":";}
+  else if(kind == ';') {return ";";}
+  else if(kind == ',') {return ",";}
+  else if(kind == '?') {return "?";}
+  else if(kind == '(') {return "(";}
+  else if(kind == ')') {return ")";}
+  else if(kind == '[') {return "[";}
+  else if(kind == ']') {return "]";}
   else if(kind == TOKEN_OP_LOG_OR)  {return "||";}
   else if(kind == TOKEN_OP_LOG_AND) {return "&&";}
   else if(kind == TOKEN_OP_REL_EQ)  {return "==";}
@@ -320,11 +305,7 @@ static char *get_nonchar_token_kind_name(t_token_kind kind) {
   else if(kind == TOKEN_OP_ASHIFTR_ASSIGN) {return ">>>=";}
   else if(kind == TOKEN_OP_BIG_ARROW) {return "=>";}
   else if(kind == TOKEN_OP_ARROW) {return "->";}
+  else if(kind == TOKEN_OP_REVERSE_ARROW) {return "<-";}
   else if(kind == 0) {return "EOF";}
   return "{unknown token}";
-}
-
-static void print_token_kind(t_token token) {
-  if(token.kind < 128) printf("%c", token.kind);
-  else printf("%s", get_nonchar_token_kind_name(token.kind));
 }

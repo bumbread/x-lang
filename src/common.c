@@ -1,8 +1,3 @@
-#include<ctype.h>
-#include<assert.h>
-#include<stdlib.h>
-
-#include<stdint.h>
 int8_t   typedef i8;
 uint8_t  typedef u8;
 int16_t  typedef i16;
@@ -23,8 +18,6 @@ u64      typedef ptr;
 #define  kb      1024
 #define  mb      1024*kb
 #define  gb      1024*mb
-
-#include<stdarg.h>
 
 void panicf(char *message, ...) {
   va_list args;

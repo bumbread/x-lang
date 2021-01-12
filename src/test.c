@@ -10,8 +10,7 @@ static void token_print(t_token token) {
     printf(" [%.*s] ", (int)(token.end - token.start), token.start);
   }
   else {
-    char *token_name = get_nonchar_token_kind_name(token.kind);
-    printf(" `%s` ", token_name);
+    printf(" `%s` ", get_token_kind_name(token.kind));
   }
 }
 

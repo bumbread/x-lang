@@ -1,24 +1,4 @@
 
-static inline bool token_is(t_lexstate *state, t_token_kind kind) {
-  return state->last_token.kind == kind;
-}
-
-static inline bool token_match(t_lexstate *state, t_token_kind kind) {
-  if(state->last_token.kind == kind) {
-    state_parse_next_token(state);
-    return true;
-  }
-  return false;
-}
-
-static inline bool token_match_val(t_lexstate *state) {
-  if(state->last_token.kind >= TOKEN_INT && state->last_token.kind <= TOKEN_STR) {
-    state_parse_next_token(state);
-    return true;
-  }
-  return false;
-}
-
 struct t_ast_node_ typedef t_ast_node;
 enum {
   TYPE_NONE,
@@ -141,6 +121,28 @@ static t_ast_node *allocate_node(void) {
   return arena_alloc(&ast_arena, sizeof(t_ast_node), 8);
 }
 
+static inline bool token_is(t_lexstate *state, t_token_kind kind) {
+  return state->last_token.kind == kind;
+}
+
+static inline bool token_match(t_lexstate *state, t_token_kind kind) {
+  if(state->last_token.kind == kind) {
+    state_parse_next_token(state);
+    return true;
+  }
+  return false;
+}
+
+static inline bool token_expect(t_lexstate *state, t_token_kind kind) {
+  if(state->last_token.kind == kind) {
+    state_parse_next_token(state);
+    return true;
+  }
+  set_errorf("error: expected token %s, got %s", 
+             get_token_kind_name(kind), get_token_kind_name(state->last_token.kind));
+  return false;
+}
+
 //
 // expr3 = val | '(' expr0 ')'
 // expr2 = expr3 | -expr3
@@ -154,9 +156,7 @@ static t_ast_node *parse_expr0(t_lexstate *state);
 static t_ast_node *parse_expr3(t_lexstate *state) {
   if(token_match(state, '(')) {
     t_ast_node *expr0 = parse_expr0(state);
-    if(false == token_match(state, ')')) {
-      set_errorf("fatal: unmatched parenthesis");
-    }
+    token_expect(state, ')');
     return expr0;
   }
   else {
@@ -232,12 +232,7 @@ static t_ast_node *parse_expr(t_lexstate *state) {
 
 static bool assert_token_type(t_token *token, t_token_kind kind) {
   if(token->kind != kind) {
-    if(token->kind < 128) {
-      set_errorf("expected token_int, found '%c'", token->kind);
-    }
-    else {
-      set_errorf("expected token_int, found '%s'", get_nonchar_token_kind_name(token->kind));
-    }
+    set_errorf("expected %s, found '%s'", get_token_kind_name(kind), get_token_kind_name(token->kind));
     return false;
   }
   return true;
@@ -276,7 +271,7 @@ static i64 ast_node_evaluate(t_ast_node *ast_node) {
           case '/': {
             i64 bottom = ast_node_evaluate(ast_node->expr.binary_operand_right);
             if(bottom == 0) {
-              set_errorf("error division by zero");
+              set_errorf("error: division by zero");
               return 0;
             }
             return ast_node_evaluate(ast_node->expr.binary_operand_left) / bottom;
@@ -304,13 +299,13 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
       } break;
       case EXPR_UNARY: {
         printf("(");
-        print_token_kind(ast_node->expr.unary_operation);
+        printf("%s", get_token_kind_name(ast_node->expr.unary_operation.kind));
         ast_node_print_lisp(ast_node->expr.unary_operand);
         printf(")");
       } break;
       case EXPR_BINARY: {
         printf("(");
-        print_token_kind(ast_node->expr.binary_operation);
+        printf("%s", get_token_kind_name(ast_node->expr.binary_operation.kind));
         ast_node_print_lisp(ast_node->expr.binary_operand_left);
         ast_node_print_lisp(ast_node->expr.binary_operand_right);
         printf(")");
