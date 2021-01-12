@@ -238,51 +238,70 @@ static bool assert_token_type(t_token *token, t_token_kind kind) {
   return true;
 }
 
-static i64 ast_node_evaluate(t_ast_node *ast_node) {
+static t_token token_eof = {.kind = TOKEN_EOF,};
+static t_token ast_node_evaluate(t_ast_node *ast_node) {
   if(ast_node == null) {
     set_errorf("empty expression");
-    return 0;
+    return token_eof;
   }
   
   if(ast_node->type == TYPE_EXPR) {
     switch(ast_node->expr.type) {
       case EXPR_VALUE: {
-        if(assert_token_type(&ast_node->expr.value, TOKEN_INT)) {
-          return ast_node->expr.value.int_value;
-        }
-        return 0;
+        return ast_node->expr.value;
       } break;
       case EXPR_UNARY: {
-        switch(ast_node->expr.unary_operation.kind) {
-          case '-': return -ast_node_evaluate(ast_node->expr.unary_operand);
+        t_token value = ast_node_evaluate(ast_node->expr.unary_operand);
+        t_token_kind op = ast_node->expr.unary_operation.kind;
+        if(value.kind == TOKEN_INT) {
+          if(op == '-') {
+            value.int_value = -value.int_value;
+            return value;
+          }
+        }
+        else {
+          set_errorf("operation %s not permitted on token type %s",
+                     get_token_kind_name(op), get_token_kind_name(value.kind));
         }
       } break;
       case EXPR_BINARY: {
-        switch(ast_node->expr.binary_operation.kind) {
-          case '+': return
-            ast_node_evaluate(ast_node->expr.binary_operand_left) 
-            + ast_node_evaluate(ast_node->expr.binary_operand_right);
-          case '-': return
-            ast_node_evaluate(ast_node->expr.binary_operand_left) 
-            - ast_node_evaluate(ast_node->expr.binary_operand_right);
-          case '*': return
-            ast_node_evaluate(ast_node->expr.binary_operand_left) 
-            * ast_node_evaluate(ast_node->expr.binary_operand_right);
-          case '/': {
-            i64 bottom = ast_node_evaluate(ast_node->expr.binary_operand_right);
-            if(bottom == 0) {
-              set_errorf("error: division by zero");
-              return 0;
-            }
-            return ast_node_evaluate(ast_node->expr.binary_operand_left) / bottom;
+        t_token_kind op = ast_node->expr.binary_operation.kind;
+        t_token result;
+        t_token left = ast_node_evaluate(ast_node->expr.binary_operand_left);
+        t_token right = ast_node_evaluate(ast_node->expr.binary_operand_right);
+        
+        if(left.kind == TOKEN_INT && right.kind == TOKEN_INT) {
+          result.kind = TOKEN_INT;
+          switch(op) {
+            case '+': {
+              result.int_value = left.int_value + right.int_value;
+            } break;
+            case '-': {
+              result.int_value = left.int_value - right.int_value;
+            } break;
+            case '*': {
+              result.int_value = left.int_value * right.int_value;
+            } break;
+            case '/': {
+              if(right.int_value == 0) set_errorf("error: division by zero");
+              else result.int_value = left.int_value / right.int_value;
+            } break;
           }
+          return result;
         }
+        else {
+          set_errorf("operation %s not permitted on tokens %s, %s",
+                     get_token_kind_name(op), 
+                     get_token_kind_name(left.kind),
+                     get_token_kind_name(right.kind));
+        }
+        return token_eof;
       } break;
     }
   }
   
-  set_errorf("undefined operation");
-  return 0;
+  set_errorf("string is not an expression");
+  return token_eof;
 }
 
 static void ast_node_print_lisp(t_ast_node *ast_node) {

@@ -35,10 +35,11 @@ int main(void) {
     t_ast_node *expr = parse_expr(&state);
     check_errors();
     ast_node_print_lisp(expr);
-    u64 result = ast_node_evaluate(expr);
+    printf("\n");
+    t_token result = ast_node_evaluate(expr);
     
     if(error == false) {
-      printf("\nresult: %lld\n", result);
+      printf("(%s) %lld\n", get_token_kind_name(result.kind), result.int_value);
     }
     else {
       printf("error: %s\n", last_error);

@@ -83,7 +83,7 @@ static void test_lexing(void) {
 #undef test_token_chr
 #undef test_token_str
 
-static i64 test_parse_expression(char const *expression) {
+static t_token test_parse_expression(char const *expression) {
   t_lexstate state;
   state_init(&state, expression);
   state_parse_next_token(&state);
@@ -92,7 +92,7 @@ static i64 test_parse_expression(char const *expression) {
   return ast_node_evaluate(expr);
 }
 
-#define test_expr(e) assert((e) == test_parse_expression(#e))
+#define test_expr(e) assert((e) == (test_parse_expression(#e).int_value))
 static void test_parsing(void) {
   ptr pool_size = 10*mb;
   void *pool = malloc(pool_size);
