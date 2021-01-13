@@ -252,6 +252,9 @@ static void state_parse_next_token(t_lexstate *state) {
       if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_NEQ;
       else state->last_token.kind = '!';
     }
+    else if(*state->stream == 0) {
+      state->last_token.kind = TOKEN_EOF;
+    }
     else {
       state->last_token.kind = *state->stream;
       state_next_char(state);
@@ -309,3 +312,4 @@ static char *get_token_kind_name(t_token_kind kind) {
   else if(kind == 0) {return "EOF";}
   return "{unknown token}";
 }
+

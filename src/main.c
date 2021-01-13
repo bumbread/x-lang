@@ -25,6 +25,9 @@ int main(void) {
   test_vm_compiler();
   test_interns();
   
+  init_interns(malloc);
+  parser_init_memory(10*mb, malloc(10*mb));
+  
   t_lexstate state;
   while(true) {
     char buf[1024];
@@ -32,7 +35,7 @@ int main(void) {
     state_init(&state, buf);
     
     state_parse_next_token(&state);
-    t_ast_node *expr = parse_expr(&state);
+    t_ast_node *expr = parse_stmt(&state);
     check_errors();
     ast_node_print_lisp(expr);
     printf("\n");

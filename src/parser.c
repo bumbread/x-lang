@@ -1,11 +1,11 @@
 
 struct t_ast_node_ typedef t_ast_node;
 enum {
-  TYPE_NONE,
-  TYPE_TYPE,
-  TYPE_EXPR,
-  TYPE_STMT,
-  TYPE_DECL,
+  NODE_NONE,
+  NODE_TYPE,
+  NODE_EXPR,
+  NODE_STMT,
+  NODE_DECL,
 } typedef t_ast_node_type;
 
 enum {
@@ -32,20 +32,15 @@ struct {
 } typedef t_ast_expr;
 
 enum {
-  _TYPE_NONE,
+  TYPE_NONE,
   TYPE_INT,
   TYPE_FLOAT,
-  TYPE_STRUCT,
-  TYPE_ENUM,
-  TYPE_UNION,
   TYPE_POINTER,
-  TYPE_ARRAY,
   TYPE_FUNC
-} typedef t_type_type;
+} typedef t_typespec_name;
 
 struct {
-  t_type_type type;
-  t_intern *name;
+  t_typespec_name type;
   union {
     // pointers, arrays.
     t_ast_node *base_type;
@@ -62,6 +57,7 @@ struct {
 enum {
   DECL_NONE,
   DECL_VAR,
+  //
   DECL_TYPE,
   DECL_ALIAS,
   DECL_STATIC,
@@ -70,9 +66,9 @@ enum {
 
 struct {
   t_decl_type type;
-  t_ast_node *decl_type;
-  t_intern *name;
-  t_ast_node *default_value;
+  t_ast_node *type_name;
+  t_intern const *name;
+  t_ast_node *value;
 } typedef t_ast_decl;
 
 enum {
@@ -80,8 +76,9 @@ enum {
   STMT_IF,
   STMT_WHILE,
   STMT_BREAK,
+  STMT_CONTINUE,
   STMT_RETURN,
-  STMT_YIELD,
+  STMT_COMPOUND,
 } typedef t_stmt_type;
 
 struct {
@@ -98,6 +95,10 @@ struct {
     struct {
       t_ast_node *value;
     };
+    // compound
+    struct {
+      t_ast_node *first_stmt;
+    };
   };
 } typedef t_ast_stmt;
 
@@ -106,15 +107,41 @@ struct t_ast_node_ {
   union {
     t_ast_expr expr;
     t_ast_decl decl;
-    t_ast_type asttype;
+    t_ast_type type_name;
     t_ast_stmt stmt;
   };
 };
 
 static t_arena ast_arena;
+static t_intern const *keyword_if;
+static t_intern const *keyword_else;
+static t_intern const *keyword_while;
+
+static t_intern const *keyword_break;
+static t_intern const *keyword_continue;
+static t_intern const *keyword_return;
+
+static t_intern const *keyword_var;
+static t_intern const *keyword_byte;
+static t_intern const *keyword_int;
+static t_intern const *keyword_float;
+static t_intern const *keyword_string;
 
 static void parser_init_memory(ptr buffer_size, void *buffer) {
   arena_init(&ast_arena, buffer_size, buffer);
+  keyword_if       = intern_cstring("if");
+  keyword_else     = intern_cstring("else");
+  keyword_while    = intern_cstring("while");
+  
+  keyword_break    = intern_cstring("break");
+  keyword_continue = intern_cstring("continue");
+  keyword_return   = intern_cstring("return");
+  
+  keyword_var      = intern_cstring("var");
+  keyword_int      = intern_cstring("byte");
+  keyword_int      = intern_cstring("int");
+  keyword_float    = intern_cstring("float");
+  keyword_string   = intern_cstring("string");
 }
 
 static t_ast_node *allocate_node(void) {
@@ -143,6 +170,31 @@ static inline bool token_expect(t_lexstate *state, t_token_kind kind) {
   return false;
 }
 
+
+static inline bool token_is_word(t_lexstate *state, t_intern *str) {
+  if(state->last_token.kind == TOKEN_IDN) {
+    return state->last_token.str_value == str;
+  }
+  return false;
+}
+
+static inline bool token_match_word(t_lexstate *state, t_intern const *str) {
+  if(state->last_token.kind == TOKEN_IDN && state->last_token.str_value == str) {
+    state_parse_next_token(state);
+    return true;
+  }
+  return false;
+}
+
+static inline bool token_expect_word(t_lexstate *state, t_intern const *str) {
+  if(state->last_token.kind == TOKEN_IDN && state->last_token.str_value == str) {
+    state_parse_next_token(state);
+    return true;
+  }
+  set_errorf("error: expected keyword %s, got %s", state->last_token.str_value->str, str->str);
+  return false;
+}
+
 //
 // expr3 = val | '(' expr0 ')'
 // expr2 = expr3 | -expr3
@@ -159,9 +211,9 @@ static t_ast_node *parse_expr3(t_lexstate *state) {
     token_expect(state, ')');
     return expr0;
   }
-  else {
+  else if(state->last_token.kind != TOKEN_EOF) {
     t_ast_node *node = allocate_node();
-    node->type = TYPE_EXPR;
+    node->type = NODE_EXPR;
     node->expr.type = EXPR_VALUE;
     node->expr.value = state->last_token;
     state_parse_next_token(state);
@@ -175,7 +227,7 @@ static t_ast_node *parse_expr2(t_lexstate *state) {
   t_token op_token = state->last_token;
   if(token_match(state, '-')) {
     t_ast_node *node = allocate_node();
-    node->type = TYPE_EXPR;
+    node->type = NODE_EXPR;
     node->expr.type = EXPR_UNARY;
     node->expr.unary_operation = op_token;
     node->expr.unary_operand = parse_expr3(state);
@@ -194,7 +246,7 @@ static t_ast_node *parse_expr1(t_lexstate *state) {
     t_ast_node *operand_right = parse_expr2(state);
     
     t_ast_node *node = allocate_node();
-    node->type = TYPE_EXPR;
+    node->type = NODE_EXPR;
     node->expr.type = EXPR_BINARY;
     node->expr.binary_operation = op_token;
     node->expr.binary_operand_left = operand_left;
@@ -212,7 +264,7 @@ static t_ast_node *parse_expr0(t_lexstate *state) {
     t_ast_node *operand_right = parse_expr1(state);
     
     t_ast_node *node = allocate_node();
-    node->type = TYPE_EXPR;
+    node->type = NODE_EXPR;
     node->expr.type = EXPR_BINARY;
     node->expr.binary_operation = op_token;
     node->expr.binary_operand_left = operand_left;
@@ -223,11 +275,170 @@ static t_ast_node *parse_expr0(t_lexstate *state) {
 }
 
 static t_ast_node *parse_expr(t_lexstate *state) {
-  t_ast_node *expr = parse_expr0(state);
-  if(state->last_token.kind != TOKEN_EOF) {
-    set_errorf("not an expression!\n");
+  return parse_expr0(state);
+}
+
+/* STATEMENTS PARSER */
+
+static t_ast_node *parse_assignment(t_lexstate *state) {
+  
+}
+
+static t_ast_node *parse_stmts(t_lexstate *state);
+
+static t_ast_node *parse_if_stmt(t_lexstate *state) {
+  /* `if` was matched */
+  t_ast_node *node = allocate_node();
+  
+  t_ast_node *condition = parse_expr(state);
+  token_expect(state, '{');
+  t_ast_node *block = parse_stmts(state);
+  token_expect(state, '}');
+  if(token_match_word(state, keyword_else)) {
+    t_ast_node *else_stmt;
+    if(token_match_word(state, keyword_if)) {
+      else_stmt = parse_if_stmt(state);
+    }
+    else {
+      token_expect(state, '{');
+      else_stmt = parse_stmts(state);
+      token_expect(state, '}');
+    }
+    node->stmt.else_stmt = else_stmt;
   }
-  return expr;
+  
+  node->stmt.condition = condition;
+  node->stmt.block = block;
+  node->type = NODE_STMT;
+  node->stmt.type = STMT_IF;
+  return node;
+}
+
+static t_ast_node *parse_while_stmt(t_lexstate *state) {
+  /* `while` was matched */
+  t_ast_node *condition = parse_expr(state);
+  token_expect(state, '{');
+  t_ast_node *block = parse_stmts(state);
+  token_expect(state, '}');
+  
+  t_ast_node *node = allocate_node();
+  node->type = NODE_STMT;
+  node->stmt.type = STMT_WHILE;
+  node->stmt.condition = condition;
+  node->stmt.block = block;
+  return node;
+}
+
+static t_ast_node *parse_initializer(t_lexstate *state) {
+  if(token_match(state, '=')) {
+    if(token_match(state, '{')) {
+      t_ast_node *block = parse_stmts(state);
+      token_expect(state, '}');
+      return block;
+    }
+    t_ast_node *initializer = parse_expr(state);
+    return initializer;
+  }
+  else if(token_match(state, '{')) {
+    t_ast_node *block = parse_stmts(state);
+    token_expect(state, '}');
+    return block;
+  }
+  return null;
+}
+
+static t_ast_node *parse_type(t_lexstate *state) {
+  if(token_match_word(state, keyword_int)) {
+    t_ast_node *identifier_node = allocate_node();
+    identifier_node->type = NODE_TYPE;
+    identifier_node->type_name.type = TYPE_INT;
+    return identifier_node;
+  }
+  return null;
+}
+
+static t_ast_node *parse_declaration(t_lexstate *state) {
+  t_ast_node *node = allocate_node();
+  node->type = NODE_DECL;
+  node->decl.type = DECL_VAR;
+  
+  node->decl.type_name = parse_type(state);
+  t_token name = state->last_token;
+  if(token_expect(state, TOKEN_IDN)) {
+    node->decl.name = name.str_value;
+  }
+  
+  node->decl.value = parse_initializer(state);
+  token_expect(state, ';');
+  
+  return node;
+}
+
+static t_ast_node *parse_stmt(t_lexstate *state) {
+  t_ast_node *node = null;
+  if(token_match_word(state, keyword_if)) {
+    node = parse_if_stmt(state);
+  }
+  else if(token_match_word(state, keyword_while)) {
+    node = parse_while_stmt(state);
+  }
+  else if(token_match_word(state, keyword_return)) {
+    node = allocate_node();
+    node->type = NODE_STMT;
+    node->stmt.type = STMT_RETURN;
+  }
+  else if(token_match_word(state, keyword_break)) {
+    node = allocate_node();
+    node->type = NODE_STMT;
+    node->stmt.type = STMT_BREAK;
+  }
+  else if(token_match_word(state, keyword_continue)) {
+    node = allocate_node();
+    node->type = NODE_STMT;
+    node->stmt.type = STMT_CONTINUE;
+  }
+  else if(token_match_word(state, keyword_var)) {
+    node = parse_declaration(state);
+  }
+  else if(token_match(state, '{')) {
+    node = parse_stmts(state);
+    token_expect(state, '}');
+  }
+  else {
+    // TODO(bumbread): make sure
+    // parsing empty expressions doesn't leak
+    node = parse_expr(state);
+    token_expect(state, ';');
+  }
+  return node;
+}
+
+static t_ast_node *parse_stmts(t_lexstate *state) {
+  t_ast_node *block = allocate_node();
+  block->type = NODE_STMT;
+  block->stmt.type = STMT_COMPOUND;
+  block->stmt.first_stmt = null;
+  
+  t_ast_node *last = null;
+  while(true) {
+    t_ast_node *node = null;
+    
+    if(node == null || token_is(state, '}')) {
+      break;
+    }
+    else {
+      node = parse_stmt(state);
+    }
+    
+    if(last != null) {
+      last->stmt.next = node;
+    } else {
+      block->stmt.first_stmt = node;
+    }
+    
+    last = node;
+  }
+  return block;
 }
 
 static bool assert_token_type(t_token *token, t_token_kind kind) {
@@ -245,7 +456,7 @@ static t_token ast_node_evaluate(t_ast_node *ast_node) {
     return token_eof;
   }
   
-  if(ast_node->type == TYPE_EXPR) {
+  if(ast_node->type == NODE_EXPR) {
     switch(ast_node->expr.type) {
       case EXPR_VALUE: {
         return ast_node->expr.value;
@@ -309,7 +520,7 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
     printf("()");
     return;
   }
-  if(ast_node->type == TYPE_EXPR) {
+  if(ast_node->type == NODE_EXPR) {
     switch(ast_node->expr.type) {
       case EXPR_VALUE: {
         if(assert_token_type(&ast_node->expr.value, TOKEN_INT)) {
@@ -332,7 +543,7 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
       default: set_errorf("undefined operation");
     }
   }
-  else if(ast_node->type == TYPE_STMT) {
+  else if(ast_node->type == NODE_STMT) {
     switch(ast_node->stmt.type) {
       case STMT_IF: {
         printf("(if ");
@@ -359,11 +570,6 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
         printf("(return ");
         ast_node_print_lisp(ast_node->stmt.value);
         printf(")");;
-      } break;
-      case STMT_YIELD: {
-        printf("(yield ");
-        ast_node_print_lisp(ast_node->stmt.value);
-        printf(")");
       } break;
     }
   }
