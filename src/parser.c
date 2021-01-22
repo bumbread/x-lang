@@ -287,12 +287,12 @@ static t_ast_node *parse_expr4(t_lexstate *state) {
 }
 
 static t_ast_node *parse_expr5(t_lexstate *state) {
-  t_ast_node *operand_left = parse_expr4(state);
+  t_ast_node *operand_left = parse_expr3(state);
   if(null != operand_left) {
-    while(token_is_identifier(state, keyword_and)) {
+    while(token_is(state, '+') || token_is(state, '-')) {
       t_token op_token = state->last_token;
       lex_next_token(state);
-      t_ast_node *operand_right = parse_expr4(state);
+      t_ast_node *operand_right = parse_expr3(state);
       
       t_ast_node *node = alloc_ast_node();
       node->type = NODE_EXPR;
@@ -309,10 +309,14 @@ static t_ast_node *parse_expr5(t_lexstate *state) {
 static t_ast_node *parse_expr6(t_lexstate *state) {
   t_ast_node *operand_left = parse_expr5(state);
   if(null != operand_left) {
-    while(token_is_identifier(state, keyword_or)) {
+    while(token_is(state, TOKEN_CMP_EQ)
+          || token_is(state, TOKEN_CMP_NEQ)
+          || token_is(state, TOKEN_CMP_GEQ)
+          || token_is(state, TOKEN_CMP_LEQ)
+          || token_is(state, '>')
+          || token_is(state, '<')) {
       t_token op_token = state->last_token;
       lex_next_token(state);
-      
       t_ast_node *operand_right = parse_expr5(state);
       
       t_ast_node *node = alloc_ast_node();
@@ -327,8 +331,50 @@ static t_ast_node *parse_expr6(t_lexstate *state) {
   return operand_left;
 }
 
+static t_ast_node *parse_expr7(t_lexstate *state) {
+  t_ast_node *operand_left = parse_expr6(state);
+  if(null != operand_left) {
+    while(token_is_identifier(state, keyword_and)) {
+      t_token op_token = state->last_token;
+      lex_next_token(state);
+      
+      t_ast_node *operand_right = parse_expr6(state);
+      
+      t_ast_node *node = alloc_ast_node();
+      node->type = NODE_EXPR;
+      node->expr.type = EXPR_BINARY;
+      node->expr.binary_operation = op_token;
+      node->expr.binary_operand_left = operand_left;
+      node->expr.binary_operand_right = operand_right;
+      operand_left = node;
+    }
+  }
+  return operand_left;
+}
+
+static t_ast_node *parse_expr8(t_lexstate *state) {
+  t_ast_node *operand_left = parse_expr7(state);
+  if(null != operand_left) {
+    while(token_is_identifier(state, keyword_or)) {
+      t_token op_token = state->last_token;
+      lex_next_token(state);
+      
+      t_ast_node *operand_right = parse_expr7(state);
+      
+      t_ast_node *node = alloc_ast_node();
+      node->type = NODE_EXPR;
+      node->expr.type = EXPR_BINARY;
+      node->expr.binary_operation = op_token;
+      node->expr.binary_operand_left = operand_left;
+      node->expr.binary_operand_right = operand_right;
+      operand_left = node;
+    }
+  }
+  return operand_left;
+}
+
 static t_ast_node *parse_expr(t_lexstate *state) {
-  return parse_expr6(state);
+  return parse_expr7(state);
 }
 
 /* STATEMENTS PARSER */
@@ -362,14 +408,11 @@ static t_ast_node *parse_if_stmt(t_lexstate *state) {
   t_ast_node *node = alloc_ast_node();
   
   t_ast_node *condition = parse_expr(state);
-  token_expect(state, '{');
   t_ast_node *block = parse_stmts(state);
-  token_expect(state, '}');
   if(token_match_identifier(state, keyword_else)) {
     t_ast_node *else_stmt;
-    if(token_match(state, '{')) {
+    if(token_is(state, '{')) {
       else_stmt = parse_stmts(state);
-      token_expect(state, '}');
     }
     else {
       else_stmt = parse_stmts(state);
@@ -388,9 +431,7 @@ static t_ast_node *parse_if_stmt(t_lexstate *state) {
 static t_ast_node *parse_while_stmt(t_lexstate *state) {
   token_expect_identifier(state, keyword_while);
   t_ast_node *condition = parse_expr(state);
-  token_expect(state, '{');
   t_ast_node *block = parse_stmts(state);
-  token_expect(state, '}');
   
   t_ast_node *node = alloc_ast_node();
   node->type = NODE_STMT;
@@ -588,13 +629,19 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
       } break;
       case EXPR_UNARY: {
         printf("(");
-        printf("%s", get_token_kind_name(ast_node->expr.unary_operation.kind));
+        if(ast_node->expr.binary_operation.kind == TOKEN_IDN) {
+          printf("%s", ast_node->expr.binary_operation.str_value->str);
+        }
+        else printf("%s", get_token_kind_name(ast_node->expr.binary_operation.kind));
         ast_node_print_lisp(ast_node->expr.unary_operand);
         printf(")");
       } break;
       case EXPR_BINARY: {
         printf("(");
-        printf("%s", get_token_kind_name(ast_node->expr.binary_operation.kind));
+        if(ast_node->expr.binary_operation.kind == TOKEN_IDN) {
+          printf("%s", ast_node->expr.binary_operation.str_value->str);
+        }
+        else printf("%s", get_token_kind_name(ast_node->expr.binary_operation.kind));
         ast_node_print_lisp(ast_node->expr.binary_operand_left);
         ast_node_print_lisp(ast_node->expr.binary_operand_right);
         printf(")");
