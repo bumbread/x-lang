@@ -57,16 +57,11 @@ struct {
 enum {
   DECL_NONE,
   DECL_VAR,
-  //
-  DECL_TYPE,
-  DECL_ALIAS,
-  DECL_STATIC,
-  DECL_EXTERN,
 } typedef t_decl_type;
 
 struct {
-  t_decl_type type;
-  t_ast_node *type_name;
+  //t_decl_type type;
+  //t_ast_node *type_name;
   t_intern const *name;
   t_ast_node *value;
 } typedef t_ast_decl;
@@ -78,12 +73,12 @@ enum {
   STMT_BREAK,
   STMT_CONTINUE,
   STMT_RETURN,
+  STMT_PRINT,
   STMT_COMPOUND,
 } typedef t_stmt_type;
 
 struct {
   t_stmt_type type;
-  t_ast_node *next;
   union {
     // if, else if, while
     struct {
@@ -91,7 +86,7 @@ struct {
       t_ast_node *block;
       t_ast_node *else_stmt;
     };
-    // return, yield
+    // print
     struct {
       t_ast_node *value;
     };
@@ -104,6 +99,7 @@ struct {
 
 struct t_ast_node_ {
   t_ast_node_type type;
+  t_ast_node *next;
   union {
     t_ast_expr expr;
     t_ast_decl decl;
@@ -120,6 +116,11 @@ static t_intern const *keyword_while;
 static t_intern const *keyword_break;
 static t_intern const *keyword_continue;
 static t_intern const *keyword_return;
+static t_intern const *keyword_print;
+
+static t_intern const *keyword_and;
+static t_intern const *keyword_or;
+
 
 static t_intern const *keyword_var;
 static t_intern const *keyword_byte;
@@ -136,15 +137,21 @@ static void parser_init_memory(ptr buffer_size, void *buffer) {
   keyword_break    = intern_cstring("break");
   keyword_continue = intern_cstring("continue");
   keyword_return   = intern_cstring("return");
+  keyword_print    = intern_cstring("print");
+  
+  keyword_and      = intern_cstring("and");
+  keyword_or       = intern_cstring("or");
   
   keyword_var      = intern_cstring("var");
-  keyword_int      = intern_cstring("byte");
+#if 0
+  keyword_byte     = intern_cstring("byte");
   keyword_int      = intern_cstring("int");
   keyword_float    = intern_cstring("float");
   keyword_string   = intern_cstring("string");
+#endif
 }
 
-static t_ast_node *allocate_node(void) {
+static t_ast_node *alloc_ast_node(void) {
   return arena_alloc(&ast_arena, sizeof(t_ast_node), 8);
 }
 
@@ -154,7 +161,7 @@ static inline bool token_is(t_lexstate *state, t_token_kind kind) {
 
 static inline bool token_match(t_lexstate *state, t_token_kind kind) {
   if(state->last_token.kind == kind) {
-    state_parse_next_token(state);
+    lex_next_token(state);
     return true;
   }
   return false;
@@ -162,61 +169,62 @@ static inline bool token_match(t_lexstate *state, t_token_kind kind) {
 
 static inline bool token_expect(t_lexstate *state, t_token_kind kind) {
   if(state->last_token.kind == kind) {
-    state_parse_next_token(state);
+    lex_next_token(state);
     return true;
   }
   set_errorf("error: expected token %s, got %s", 
-             get_token_kind_name(kind), get_token_kind_name(state->last_token.kind));
+             get_token_kind_name(kind), 
+             get_token_kind_name(state->last_token.kind));
   return false;
 }
 
 
-static inline bool token_is_word(t_lexstate *state, t_intern *str) {
+static inline bool token_is_identifier(t_lexstate *state, t_intern const *str) {
   if(state->last_token.kind == TOKEN_IDN) {
     return state->last_token.str_value == str;
   }
   return false;
 }
 
-static inline bool token_match_word(t_lexstate *state, t_intern const *str) {
+static inline bool token_match_identifier(t_lexstate *state, t_intern const *str) {
   if(state->last_token.kind == TOKEN_IDN && state->last_token.str_value == str) {
-    state_parse_next_token(state);
+    lex_next_token(state);
     return true;
   }
   return false;
 }
 
-static inline bool token_expect_word(t_lexstate *state, t_intern const *str) {
+static inline bool token_expect_identifier(t_lexstate *state, t_intern const *str) {
   if(state->last_token.kind == TOKEN_IDN && state->last_token.str_value == str) {
-    state_parse_next_token(state);
+    lex_next_token(state);
     return true;
   }
-  set_errorf("error: expected keyword %s, got %s", state->last_token.str_value->str, str->str);
+  set_errorf("expected keyword %s, got %s", state->last_token.str_value->str, str->str);
   return false;
 }
 
 //
-// expr3 = val | '(' expr0 ')'
-// expr2 = expr3 | -expr3
-// expr1 = expr2 [('*'|'/') expr2 ...]
-// expr0 = expr1 [('+'|'-') expr1 ...]
-// expr  = expr2
+// expr0 = val | '(' expr ')'
+// expr1 = expr0 | -expr1
+// expr2 = expr1 [('*'|'/') expr1 ...]
+// expr3 = expr2 [('+'|'-') expr2 ...]
+// expr  = expr3 [('and', 'or') expr3 ...]
 //
 
-static t_ast_node *parse_expr0(t_lexstate *state);
+static t_ast_node *parse_expr(t_lexstate *state);
 
-static t_ast_node *parse_expr3(t_lexstate *state) {
+static t_ast_node *parse_expr1(t_lexstate *state) {
   if(token_match(state, '(')) {
-    t_ast_node *expr0 = parse_expr0(state);
+    t_ast_node *expr = parse_expr(state);
     token_expect(state, ')');
-    return expr0;
+    return expr;
   }
   else if(state->last_token.kind != TOKEN_EOF) {
-    t_ast_node *node = allocate_node();
+    t_ast_node *node = alloc_ast_node();
     node->type = NODE_EXPR;
     node->expr.type = EXPR_VALUE;
     node->expr.value = state->last_token;
-    state_parse_next_token(state);
+    lex_next_token(state);
     return node;
   }
   
@@ -226,83 +234,146 @@ static t_ast_node *parse_expr3(t_lexstate *state) {
 static t_ast_node *parse_expr2(t_lexstate *state) {
   t_token op_token = state->last_token;
   if(token_match(state, '-')) {
-    t_ast_node *node = allocate_node();
+    t_ast_node *node = alloc_ast_node();
     node->type = NODE_EXPR;
     node->expr.type = EXPR_UNARY;
     node->expr.unary_operation = op_token;
-    node->expr.unary_operand = parse_expr3(state);
+    node->expr.unary_operand = parse_expr2(state);
     return node;
   }
   else {
-    return parse_expr3(state);
+    return parse_expr1(state);
   }
 }
 
-static t_ast_node *parse_expr1(t_lexstate *state) {
+static t_ast_node *parse_expr3(t_lexstate *state) {
   t_ast_node *operand_left = parse_expr2(state);
-  while(token_is(state, '*') || token_is(state, '/')) {
-    t_token op_token = state->last_token;
-    state_parse_next_token(state);
-    t_ast_node *operand_right = parse_expr2(state);
-    
-    t_ast_node *node = allocate_node();
-    node->type = NODE_EXPR;
-    node->expr.type = EXPR_BINARY;
-    node->expr.binary_operation = op_token;
-    node->expr.binary_operand_left = operand_left;
-    node->expr.binary_operand_right = operand_right;
-    operand_left = node;
+  if(null != operand_left) {
+    while(token_is(state, '*') || token_is(state, '/')) {
+      t_token op_token = state->last_token;
+      lex_next_token(state);
+      t_ast_node *operand_right = parse_expr2(state);
+      
+      t_ast_node *node = alloc_ast_node();
+      node->type = NODE_EXPR;
+      node->expr.type = EXPR_BINARY;
+      node->expr.binary_operation = op_token;
+      node->expr.binary_operand_left = operand_left;
+      node->expr.binary_operand_right = operand_right;
+      operand_left = node;
+    }
   }
   return operand_left;
 }
 
-static t_ast_node *parse_expr0(t_lexstate *state) {
-  t_ast_node *operand_left = parse_expr1(state);
-  while(token_is(state, '+') || token_is(state, '-')) {
-    t_token op_token = state->last_token;
-    state_parse_next_token(state);
-    t_ast_node *operand_right = parse_expr1(state);
-    
-    t_ast_node *node = allocate_node();
-    node->type = NODE_EXPR;
-    node->expr.type = EXPR_BINARY;
-    node->expr.binary_operation = op_token;
-    node->expr.binary_operand_left = operand_left;
-    node->expr.binary_operand_right = operand_right;
-    operand_left = node;
+static t_ast_node *parse_expr4(t_lexstate *state) {
+  t_ast_node *operand_left = parse_expr3(state);
+  if(null != operand_left) {
+    while(token_is(state, '+') || token_is(state, '-')) {
+      t_token op_token = state->last_token;
+      lex_next_token(state);
+      t_ast_node *operand_right = parse_expr3(state);
+      
+      t_ast_node *node = alloc_ast_node();
+      node->type = NODE_EXPR;
+      node->expr.type = EXPR_BINARY;
+      node->expr.binary_operation = op_token;
+      node->expr.binary_operand_left = operand_left;
+      node->expr.binary_operand_right = operand_right;
+      operand_left = node;
+    }
+  }
+  return operand_left;
+}
+
+static t_ast_node *parse_expr5(t_lexstate *state) {
+  t_ast_node *operand_left = parse_expr4(state);
+  if(null != operand_left) {
+    while(token_is_identifier(state, keyword_and)) {
+      t_token op_token = state->last_token;
+      lex_next_token(state);
+      t_ast_node *operand_right = parse_expr4(state);
+      
+      t_ast_node *node = alloc_ast_node();
+      node->type = NODE_EXPR;
+      node->expr.type = EXPR_BINARY;
+      node->expr.binary_operation = op_token;
+      node->expr.binary_operand_left = operand_left;
+      node->expr.binary_operand_right = operand_right;
+      operand_left = node;
+    }
+  }
+  return operand_left;
+}
+
+static t_ast_node *parse_expr6(t_lexstate *state) {
+  t_ast_node *operand_left = parse_expr5(state);
+  if(null != operand_left) {
+    while(token_is_identifier(state, keyword_or)) {
+      t_token op_token = state->last_token;
+      lex_next_token(state);
+      
+      t_ast_node *operand_right = parse_expr5(state);
+      
+      t_ast_node *node = alloc_ast_node();
+      node->type = NODE_EXPR;
+      node->expr.type = EXPR_BINARY;
+      node->expr.binary_operation = op_token;
+      node->expr.binary_operand_left = operand_left;
+      node->expr.binary_operand_right = operand_right;
+      operand_left = node;
+    }
   }
   return operand_left;
 }
 
 static t_ast_node *parse_expr(t_lexstate *state) {
-  return parse_expr0(state);
+  return parse_expr6(state);
 }
 
 /* STATEMENTS PARSER */
 
 static t_ast_node *parse_assignment(t_lexstate *state) {
-  
+  t_ast_node *lhs = parse_expr(state);
+  if(null != lhs) {
+    if(token_is(state, '=')) {
+      t_token op_token = state->last_token;
+      lex_next_token(state);
+      
+      t_ast_node *rhs = parse_expr(state);
+      
+      t_ast_node *node = alloc_ast_node();
+      node->type = NODE_EXPR;
+      node->expr.type = EXPR_BINARY;
+      node->expr.binary_operation = op_token;
+      node->expr.binary_operand_left = lhs;
+      node->expr.binary_operand_right = rhs;
+      lhs = node;
+    }
+  }
+  return lhs;
 }
 
 static t_ast_node *parse_stmts(t_lexstate *state);
+static t_ast_node *parse_stmt(t_lexstate *state);
 
 static t_ast_node *parse_if_stmt(t_lexstate *state) {
-  /* `if` was matched */
-  t_ast_node *node = allocate_node();
+  token_expect_identifier(state, keyword_if);
+  t_ast_node *node = alloc_ast_node();
   
   t_ast_node *condition = parse_expr(state);
   token_expect(state, '{');
   t_ast_node *block = parse_stmts(state);
   token_expect(state, '}');
-  if(token_match_word(state, keyword_else)) {
+  if(token_match_identifier(state, keyword_else)) {
     t_ast_node *else_stmt;
-    if(token_match_word(state, keyword_if)) {
-      else_stmt = parse_if_stmt(state);
-    }
-    else {
-      token_expect(state, '{');
+    if(token_match(state, '{')) {
       else_stmt = parse_stmts(state);
       token_expect(state, '}');
+    }
+    else {
+      else_stmt = parse_stmts(state);
+      token_expect(state, ';');
     }
     node->stmt.else_stmt = else_stmt;
   }
@@ -315,13 +386,13 @@ static t_ast_node *parse_if_stmt(t_lexstate *state) {
 }
 
 static t_ast_node *parse_while_stmt(t_lexstate *state) {
-  /* `while` was matched */
+  token_expect_identifier(state, keyword_while);
   t_ast_node *condition = parse_expr(state);
   token_expect(state, '{');
   t_ast_node *block = parse_stmts(state);
   token_expect(state, '}');
   
-  t_ast_node *node = allocate_node();
+  t_ast_node *node = alloc_ast_node();
   node->type = NODE_STMT;
   node->stmt.type = STMT_WHILE;
   node->stmt.condition = condition;
@@ -329,92 +400,76 @@ static t_ast_node *parse_while_stmt(t_lexstate *state) {
   return node;
 }
 
-static t_ast_node *parse_initializer(t_lexstate *state) {
-  if(token_match(state, '=')) {
-    if(token_match(state, '{')) {
-      t_ast_node *block = parse_stmts(state);
-      token_expect(state, '}');
-      return block;
-    }
-    t_ast_node *initializer = parse_expr(state);
-    return initializer;
-  }
-  else if(token_match(state, '{')) {
-    t_ast_node *block = parse_stmts(state);
-    token_expect(state, '}');
-    return block;
-  }
-  return null;
-}
-
-static t_ast_node *parse_type(t_lexstate *state) {
-  if(token_match_word(state, keyword_int)) {
-    t_ast_node *identifier_node = allocate_node();
-    identifier_node->type = NODE_TYPE;
-    identifier_node->type_name.type = TYPE_INT;
-    return identifier_node;
-  }
-  return null;
-}
-
 static t_ast_node *parse_declaration(t_lexstate *state) {
-  t_ast_node *node = allocate_node();
-  node->type = NODE_DECL;
-  node->decl.type = DECL_VAR;
+  token_expect_identifier(state, keyword_var);
   
-  node->decl.type_name = parse_type(state);
+  t_ast_node *node = alloc_ast_node();
+  node->type = NODE_DECL;
+  
   t_token name = state->last_token;
   if(token_expect(state, TOKEN_IDN)) {
     node->decl.name = name.str_value;
+    if(token_expect(state, '=')) {
+      t_ast_node *value = parse_expr(state);
+      node->decl.value = value;
+    }
   }
   
-  node->decl.value = parse_initializer(state);
   token_expect(state, ';');
-  
   return node;
 }
 
 static t_ast_node *parse_stmt(t_lexstate *state) {
   t_ast_node *node = null;
-  if(token_match_word(state, keyword_if)) {
+  if(token_is_identifier(state, keyword_if)) {
     node = parse_if_stmt(state);
   }
-  else if(token_match_word(state, keyword_while)) {
+  else if(token_is_identifier(state, keyword_while)) {
     node = parse_while_stmt(state);
   }
-  else if(token_match_word(state, keyword_return)) {
-    node = allocate_node();
+  else if(token_is_identifier(state, keyword_var)) {
+    node = parse_declaration(state);
+  }
+  else if(token_match_identifier(state, keyword_return)) {
+    node = alloc_ast_node();
     node->type = NODE_STMT;
     node->stmt.type = STMT_RETURN;
+    token_expect(state, ';');
   }
-  else if(token_match_word(state, keyword_break)) {
-    node = allocate_node();
+  else if(token_match_identifier(state, keyword_break)) {
+    node = alloc_ast_node();
     node->type = NODE_STMT;
     node->stmt.type = STMT_BREAK;
+    token_expect(state, ';');
   }
-  else if(token_match_word(state, keyword_continue)) {
-    node = allocate_node();
+  else if(token_match_identifier(state, keyword_continue)) {
+    node = alloc_ast_node();
     node->type = NODE_STMT;
     node->stmt.type = STMT_CONTINUE;
+    token_expect(state, ';');
   }
-  else if(token_match_word(state, keyword_var)) {
-    node = parse_declaration(state);
+  else if(token_match_identifier(state, keyword_print)) {
+    node = alloc_ast_node();
+    node->type = NODE_STMT;
+    node->stmt.type = STMT_PRINT;
+    node->stmt.value = parse_expr(state);
+    token_expect(state, ';');
   }
   else if(token_match(state, '{')) {
     node = parse_stmts(state);
     token_expect(state, '}');
   }
   else {
-    // TODO(bumbread): make sure
-    // parsing empty expressions doesn't leak
-    node = parse_expr(state);
+    node = parse_assignment(state);
     token_expect(state, ';');
   }
   return node;
 }
 
 static t_ast_node *parse_stmts(t_lexstate *state) {
-  t_ast_node *block = allocate_node();
+  if(!token_expect(state, '{')) return null;
+  
+  t_ast_node *block = alloc_ast_node();
   block->type = NODE_STMT;
   block->stmt.type = STMT_COMPOUND;
   block->stmt.first_stmt = null;
@@ -423,7 +478,7 @@ static t_ast_node *parse_stmts(t_lexstate *state) {
   while(true) {
     t_ast_node *node = null;
     
-    if(node == null || token_is(state, '}')) {
+    if(token_match(state, '}')) {
       break;
     }
     else {
@@ -431,7 +486,7 @@ static t_ast_node *parse_stmts(t_lexstate *state) {
     }
     
     if(last != null) {
-      last->stmt.next = node;
+      last->next = node;
     } else {
       block->stmt.first_stmt = node;
     }
@@ -510,21 +565,25 @@ static t_token ast_node_evaluate(t_ast_node *ast_node) {
       } break;
     }
   }
-  
-  set_errorf("string is not an expression");
+  else {
+    set_errorf("not an expression");
+  }
   return token_eof;
 }
 
 static void ast_node_print_lisp(t_ast_node *ast_node) {
   if(ast_node == null) {
-    printf("()");
+    printf("(nul)");
     return;
   }
   if(ast_node->type == NODE_EXPR) {
     switch(ast_node->expr.type) {
       case EXPR_VALUE: {
-        if(assert_token_type(&ast_node->expr.value, TOKEN_INT)) {
+        if(ast_node->expr.value.kind == TOKEN_INT) {
           printf(" %llu ", ast_node->expr.value.int_value);
+        }
+        else if(ast_node->expr.value.kind == TOKEN_IDN) {
+          printf(" %s ", ast_node->expr.value.str_value->str);
         }
       } break;
       case EXPR_UNARY: {
@@ -567,11 +626,34 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
         printf("break ");
       } break;
       case STMT_RETURN: {
-        printf("(return ");
+        printf("return ");
+      } break;
+      case STMT_CONTINUE: {
+        printf("continue ");
+      } break;
+      case STMT_PRINT: {
+        printf("(print ");
         ast_node_print_lisp(ast_node->stmt.value);
-        printf(")");;
+        printf(")");
+      } break;
+      case STMT_COMPOUND: {
+        printf("(compound ");
+        for(t_ast_node *node = ast_node->stmt.first_stmt;
+            node != null;
+            node = node->next) {
+          ast_node_print_lisp(node);
+        }
+        printf(")");
       } break;
     }
+  }
+  else if(ast_node->type == NODE_DECL) {
+    printf("(decl ");
+    printf("%s", ast_node->decl.name->str);
+    if(null != ast_node->decl.value) {
+      ast_node_print_lisp(ast_node->decl.value);
+    }
+    printf(")");
   }
 }
 

@@ -15,40 +15,34 @@
 #include"lexer.c"
 #include"parser.c"
 
-#include"vm.c"
 #include"test.c"
 
 int main(void) {
   test_lexing();
-  test_parsing();
-  test_vm();
-  test_vm_compiler();
   test_interns();
   
   init_interns(malloc);
   parser_init_memory(10*mb, malloc(10*mb));
   
-  t_lexstate state;
-  while(true) {
-    char buf[1024];
-    printf("x-shell$ "); fgets(buf, sizeof buf, stdin);
-    state_init(&state, buf);
-    
-    state_parse_next_token(&state);
-    t_ast_node *expr = parse_stmt(&state);
-    check_errors();
-    ast_node_print_lisp(expr);
-    printf("\n");
-    t_token result = ast_node_evaluate(expr);
-    
-    if(error == false) {
-      printf("(%s) %lld\n", get_token_kind_name(result.kind), result.int_value);
-    }
-    else {
-      printf("error: %s\n", last_error);
-      error = false;
-    }
+  byte *buf;
+  char const *filename = "test.x";
+  FILE *input = fopen(filename, "rb");
+  if(null == input) {
+    printf("filename '%s' not found\n", filename);
   }
+  
+  fseek(input, 0, SEEK_END);
+  size_t input_size = ftell(input);
+  fseek(input, 0, SEEK_SET);
+  buf = malloc(input_size);
+  fread(buf, input_size, 1, input);
+  
+  t_lexstate state;
+  lex_init(&state, buf);
+  lex_next_token(&state);
+  t_ast_node *code = parse_stmts(&state);
+  check_errors();
+  ast_node_print_lisp(code);
   
   return 0;
 }

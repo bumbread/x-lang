@@ -3,29 +3,13 @@ enum {
   TOKEN_EOF = 0,   // end of file
   // All ascii characters are a separate token
   // 0..127
-  TOKEN_INT = 128, // integer numbers
-  TOKEN_FLT,
-  TOKEN_IDN, // identifiers/names
-  TOKEN_STR,
   
-  // Operators having more than one symbol
-  TOKEN_OP_LOG_OR,           // ||
-  TOKEN_OP_LOG_AND,          // &&
-  TOKEN_OP_REL_EQ,           // ==
-  TOKEN_OP_REL_NEQ,          // !=
-  TOKEN_OP_REL_GEQ,          // >=
-  TOKEN_OP_REL_LEQ,          // <=
-  TOKEN_OP_LSHIFTL,          // <<
-  TOKEN_OP_LSHIFTL_ASSIGN,   // <<=
-  TOKEN_OP_LSHIFTR,          // >>
-  TOKEN_OP_LSHIFTR_ASSIGN,   // >>=
-  TOKEN_OP_ASHIFTL,          // <<<
-  TOKEN_OP_ASHIFTL_ASSIGN,   // <<<=
-  TOKEN_OP_ASHIFTR,          // >>>
-  TOKEN_OP_ASHIFTR_ASSIGN,   // >>>=
-  TOKEN_OP_BIG_ARROW,        // =>
-  TOKEN_OP_ARROW,            // ->
-  TOKEN_OP_REVERSE_ARROW,    // <-
+  TOKEN_INT = 128, // integer numbers
+  TOKEN_IDN,
+  TOKEN_CMP_NEQ,
+  TOKEN_CMP_EQ,
+  TOKEN_CMP_LEQ,
+  TOKEN_CMP_GEQ,
 } typedef t_token_kind;
 
 enum {
@@ -41,7 +25,6 @@ struct {
   char const *end;
   union {
     i64 int_value;
-    f64 flt_value;
     t_intern const *str_value;
   };
 } typedef t_token;
@@ -51,21 +34,21 @@ struct {
   t_token last_token;
 } typedef t_lexstate;
 
-static void state_init(t_lexstate *state, char const *stream) {
+static void lex_init(t_lexstate *state, char const *stream) {
   state->stream = stream;
-  t_token eof_token;
+  t_token eof_token; // to be removed later
   eof_token.start = eof_token.end = null;
   eof_token.kind = TOKEN_EOF;
   state->last_token = eof_token;
 }
 
-static inline char const state_next_char(t_lexstate *state) {
+static inline char const lex_next_char(t_lexstate *state) {
   return *state->stream++;
 }
 
-static inline bool state_match_char(t_lexstate *state, char c) {
+static inline bool lex_match_char(t_lexstate *state, char c) {
   if(*state->stream == c) {
-    state_next_char(state);
+    lex_next_char(state);
     return true;
   }
   return false;
@@ -107,21 +90,21 @@ static bool is_digit(u64 base, char c) {
   return (digit < base) && (digit != 0 || c == '0');
 }
 
-static u64 parse_integer(u64 base, char const *stream, char const **end) {
+static u64 lex_integer(u64 base, char const *stream, char const **end) {
   u64 value = 0;
-  u64 digit;
-  while((digit = char_to_digit[*stream], digit < base) && (digit != 0 || *stream == '0')) {
-    value = base*value + digit;
+  while(is_digit(base, *stream)) {
+    value = base*value + char_to_digit[*stream];
     stream += 1;
   }
   *end = stream;
   return value;
 }
 
-static char parse_escape(char const *stream, char const **end) {
+// note: not used
+static char lex_string_escape(char const *stream, char const **end) {
   char val;
   if(is_digit(16, *stream)) {
-    u64 result = parse_integer(16, stream, &stream);
+    u64 result = lex_integer(16, stream, &stream);
     if(result > 0xff) {
       set_errorf("value %x is unacceptable for a char literal", result);
     }
@@ -134,29 +117,37 @@ static char parse_escape(char const *stream, char const **end) {
   return val;
 }
 
-static void state_parse_next_token(t_lexstate *state) {
+static void lex_next_token(t_lexstate *state) {
   while(isspace(*state->stream)) {
-    state_next_char(state);
+    lex_next_char(state);
   }
   
   char const *start = state->stream;
-  state->last_token.subkind = TOKEN_SUBKIND_NONE;
   
+  // lex identifiers
   if(isalpha(*state->stream) || *state->stream == '_') {
     state->last_token.kind = TOKEN_IDN;
     while(isalnum(*state->stream) || *state->stream == '_') {
-      state_next_char(state);
+      lex_next_char(state);
     }
+    char const *end = state->stream;
+    t_intern const *string_value = intern_string(start, end);
+    state->last_token.str_value = string_value;
   }
+  
+  // lex number literals
   else if(isdigit(*state->stream)) {
     
     // searching the '.' to find whether the number is flt
     while(isdigit(*state->stream)) state->stream+=1;
     if(*state->stream == '.') {
+      set_errorf("unexpected symbol '.'");
+#if 0
       state->stream = start;
       f64 val = strtod(start, (char **)&state->stream);
       state->last_token.flt_value = val;
       state->last_token.kind = TOKEN_FLT;
+#endif
     }
     else {
       state->stream = start;
@@ -166,15 +157,15 @@ static void state_parse_next_token(t_lexstate *state) {
         else if(tolower(state->stream[1] == 'o')) base = 8;
         else if(tolower(state->stream[1] == 'b')) base = 2;
       }
-      state->last_token.int_value = parse_integer(base, state->stream, &state->stream);
+      state->last_token.int_value = lex_integer(base, state->stream, &state->stream);
+      state->last_token.subkind = TOKEN_SUBKIND_INT;
       state->last_token.kind = TOKEN_INT;
     }
   }
-  else if(state_match_char(state, '\'')) { // character literal
-    
+  else if(lex_match_char(state, '\'')) { // character literal
     u64 val;
-    if(state_match_char(state, '\\')) {
-      val = parse_escape(state->stream, &state->stream);
+    if(lex_match_char(state, '\\')) {
+      val = lex_string_escape(state->stream, &state->stream);
     }
     else if(isprint(*state->stream)) {
       val = *state->stream;
@@ -186,17 +177,19 @@ static void state_parse_next_token(t_lexstate *state) {
     state->last_token.kind = TOKEN_INT;
     state->last_token.subkind = TOKEN_SUBKIND_CHAR;
     state->last_token.int_value = val;
-    if(!state_match_char(state, '\'')) {
+    if(!lex_match_char(state, '\'')) {
       set_errorf("expected a char literal to close");
     }
   }
-  else if(state_match_char(state, '"')) { // string literal
+  else if(lex_match_char(state, '"')) { // string literal
+    set_errorf("unexpected symbol '\"'");
+#if 0    
     string_builder_start();
     while(true) {
       //char c = state_next_char(state);
-      if(state_match_char(state, '"')) break;
-      else if(state_match_char(state, '\\')) {
-        string_builder_append_char(parse_escape(state->stream, &state->stream));
+      if(lex_match_char(state, '"')) break;
+      else if(lex_match_char(state, '\\')) {
+        string_builder_append_char(lex_string_escape(state->stream, &state->stream));
       }
       else {
         string_builder_append_char(*state->stream++);
@@ -206,58 +199,40 @@ static void state_parse_next_token(t_lexstate *state) {
     t_intern const *intern = intern_string(result, result + string_builder.len);
     state->last_token.str_value = intern;
     state->last_token.kind = TOKEN_STR;
+#endif
   }
   else { // parse operators.
     
-    //state_next_char(state);
-    if(state_match_char(state, '|')) {
-      if(state_match_char(state, '|')) state->last_token.kind = TOKEN_OP_LOG_OR;
-      else state->last_token.kind = '|';
-    }
-    else if(state_match_char(state, '&')) {
-      if(state_match_char(state, '&')) state->last_token.kind = TOKEN_OP_LOG_AND;
-      else state->last_token.kind = '&';
-    }
-    else if(state_match_char(state, '=')) {
-      if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_EQ;
-      else if(state_match_char(state, '>')) state->last_token.kind = TOKEN_OP_BIG_ARROW;
-      else state->last_token.kind = '=';
-    }
-    else if(state_match_char(state, '>')) {
-      if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_GEQ;
-      else if(state_match_char(state, '>')) {
-        if(state_match_char(state, '>')) {
-          if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_ASHIFTR_ASSIGN;
-          else state->last_token.kind = TOKEN_OP_ASHIFTR;
-        }
-        else if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_LSHIFTR_ASSIGN;
-        else state->last_token.kind = TOKEN_OP_LSHIFTR;
+    if(lex_match_char(state, '=')) {
+      state->last_token.kind = '=';
+      if(lex_match_char(state, '=')) {
+        state->last_token.kind = TOKEN_CMP_EQ;
       }
-      else state->last_token.kind = '>';
     }
-    else if(state_match_char(state, '<')) {
-      if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_LEQ;
-      else if(state_match_char(state, '-')) state->last_token.kind = TOKEN_OP_REVERSE_ARROW;
-      else if(state_match_char(state, '<')) {
-        if(state_match_char(state, '<')) {
-          if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_ASHIFTL_ASSIGN;
-          else state->last_token.kind = TOKEN_OP_ASHIFTL;
-        }
-        else if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_LSHIFTL_ASSIGN;
-        else state->last_token.kind = TOKEN_OP_LSHIFTL;
+    else if(lex_match_char(state, '!')) {
+      state->last_token.kind = '!';
+      if(lex_match_char(state, '=')) {
+        state->last_token.kind = TOKEN_CMP_NEQ;
       }
-      else state->last_token.kind = '<';
     }
-    else if(state_match_char(state, '!')) {
-      if(state_match_char(state, '=')) state->last_token.kind = TOKEN_OP_REL_NEQ;
-      else state->last_token.kind = '!';
+    else if(lex_match_char(state, '>')) {
+      state->last_token.kind = '>';
+      if(lex_match_char(state, '=')) {
+        state->last_token.kind = TOKEN_CMP_GEQ;
+      }
+    }
+    else if(lex_match_char(state, '<')) {
+      state->last_token.kind = '<';
+      if(lex_match_char(state, '=')) {
+        state->last_token.kind = TOKEN_CMP_LEQ;
+      }
     }
     else if(*state->stream == 0) {
       state->last_token.kind = TOKEN_EOF;
     }
     else {
       state->last_token.kind = *state->stream;
-      state_next_char(state);
+      lex_next_char(state);
     }
   }
   char const *end = state->stream;
@@ -268,8 +243,8 @@ static void state_parse_next_token(t_lexstate *state) {
 static char *get_token_kind_name(t_token_kind kind) {
   if(kind == TOKEN_INT) {return "INT";}
   else if(kind == TOKEN_IDN) {return "NAME";}
-  else if(kind == TOKEN_FLT) {return "FLOAT";}
-  else if(kind == TOKEN_STR) {return "STRING";}
+  //else if(kind == TOKEN_FLT) {return "FLOAT";}
+  //else if(kind == TOKEN_STR) {return "STRING";}
   else if(kind == '<') {return "<";}
   else if(kind == '>') {return ">";}
   else if(kind == '=') {return "=";}
@@ -292,23 +267,12 @@ static char *get_token_kind_name(t_token_kind kind) {
   else if(kind == ')') {return ")";}
   else if(kind == '[') {return "[";}
   else if(kind == ']') {return "]";}
-  else if(kind == TOKEN_OP_LOG_OR)  {return "||";}
-  else if(kind == TOKEN_OP_LOG_AND) {return "&&";}
-  else if(kind == TOKEN_OP_REL_EQ)  {return "==";}
-  else if(kind == TOKEN_OP_REL_NEQ) {return "!=";}
-  else if(kind == TOKEN_OP_REL_GEQ) {return ">=";}
-  else if(kind == TOKEN_OP_REL_LEQ) {return "<=";}
-  else if(kind == TOKEN_OP_LSHIFTL) {return "<<";}
-  else if(kind == TOKEN_OP_LSHIFTR) {return ">>";}
-  else if(kind == TOKEN_OP_ASHIFTL) {return "<<<";}
-  else if(kind == TOKEN_OP_ASHIFTR) {return ">>>";}
-  else if(kind == TOKEN_OP_LSHIFTL_ASSIGN) {return "<<=";}
-  else if(kind == TOKEN_OP_LSHIFTR_ASSIGN) {return ">>=";}
-  else if(kind == TOKEN_OP_ASHIFTL_ASSIGN) {return "<<<=";}
-  else if(kind == TOKEN_OP_ASHIFTR_ASSIGN) {return ">>>=";}
-  else if(kind == TOKEN_OP_BIG_ARROW) {return "=>";}
-  else if(kind == TOKEN_OP_ARROW) {return "->";}
-  else if(kind == TOKEN_OP_REVERSE_ARROW) {return "<-";}
+  else if(kind == '{') {return "{";}
+  else if(kind == '}') {return "}";}
+  else if(kind == TOKEN_CMP_NEQ) {return "!=";}
+  else if(kind == TOKEN_CMP_EQ) {return "==";}
+  else if(kind == TOKEN_CMP_LEQ) {return "<=";}
+  else if(kind == TOKEN_CMP_GEQ) {return ">=";}
   else if(kind == 0) {return "EOF";}
   return "{unknown token}";
 }
