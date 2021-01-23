@@ -91,6 +91,16 @@ struct {
   ptr align;
 } typedef t_stack;
 
+
+ptr typedef t_stack_savepoint;
+static t_stack_savepoint stack_save(t_stack *stack) {
+  return stack->alloc_size;
+}
+
+static void stack_restore(t_stack *stack, t_stack_savepoint save) {
+  stack->alloc_size = save;
+}
+
 static void stack_init(t_stack *stack, ptr buffer_size, void *buffer, ptr element_size, ptr align) {
   stack->buffer = buffer;
   stack->buffer_size = buffer_size;

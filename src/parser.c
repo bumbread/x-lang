@@ -17,6 +17,7 @@ enum {
 
 struct {
   t_expr_type type;
+  t_ast_node *value_type;
   union {
     t_token value;
     struct {
@@ -32,15 +33,13 @@ struct {
 } typedef t_ast_expr;
 
 enum {
-  TYPE_NONE,
-  TYPE_INT,
-  TYPE_FLOAT,
-  TYPE_POINTER,
-  TYPE_FUNC
-} typedef t_typespec_name;
+  EXPR_VOID,
+  EXPR_INT,
+  EXPR_BOOL,
+} typedef t_value_type;
 
 struct {
-  t_typespec_name type;
+  t_value_type type;
   union {
     // pointers, arrays.
     t_ast_node *base_type;
@@ -60,10 +59,10 @@ enum {
 } typedef t_decl_type;
 
 struct {
-  //t_decl_type type;
-  //t_ast_node *type_name;
+  t_decl_type type;
   t_intern const *name;
   t_ast_node *value;
+  t_ast_node *value_type;
 } typedef t_ast_decl;
 
 enum {
@@ -121,12 +120,19 @@ static t_intern const *keyword_print;
 static t_intern const *keyword_and;
 static t_intern const *keyword_or;
 
-
 static t_intern const *keyword_var;
 static t_intern const *keyword_byte;
 static t_intern const *keyword_int;
 static t_intern const *keyword_float;
 static t_intern const *keyword_string;
+
+static t_ast_node *type_int;
+static t_ast_node *type_bool;
+static t_ast_node *type_void;
+
+static t_ast_node *alloc_ast_node(void) {
+  return arena_alloc(&ast_arena, sizeof(t_ast_node), 8);
+}
 
 static void parser_init_memory(ptr buffer_size, void *buffer) {
   arena_init(&ast_arena, buffer_size, buffer);
@@ -149,10 +155,14 @@ static void parser_init_memory(ptr buffer_size, void *buffer) {
   keyword_float    = intern_cstring("float");
   keyword_string   = intern_cstring("string");
 #endif
-}
-
-static t_ast_node *alloc_ast_node(void) {
-  return arena_alloc(&ast_arena, sizeof(t_ast_node), 8);
+  
+  type_int = alloc_ast_node();
+  type_int->type = NODE_TYPE;
+  type_int->type_name.type = EXPR_INT;
+  
+  type_bool = alloc_ast_node();
+  type_bool->type = NODE_TYPE;
+  type_bool->type_name.type = EXPR_BOOL;
 }
 
 static inline bool token_is(t_lexstate *state, t_token_kind kind) {
@@ -441,11 +451,19 @@ static t_ast_node *parse_while_stmt(t_lexstate *state) {
   return node;
 }
 
+static t_ast_node *parse_type(t_lexstate *state) {
+  t_ast_node *node = alloc_ast_node();
+  node->type = NODE_TYPE;
+  node->type_name.type = EXPR_INT;
+  return node;
+}
+
 static t_ast_node *parse_declaration(t_lexstate *state) {
   token_expect_identifier(state, keyword_var);
   
   t_ast_node *node = alloc_ast_node();
   node->type = NODE_DECL;
+  node->decl.value_type = parse_type(state);
   
   t_token name = state->last_token;
   if(token_expect(state, TOKEN_IDN)) {
@@ -701,6 +719,7 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
           printf("\n");
           ast_node_print_lisp(node, level + 1);
         }
+        printf("\n");
         print_at_level(")", level);
       } break;
     }

@@ -14,6 +14,7 @@
 #include"string.c"
 #include"lexer.c"
 #include"parser.c"
+#include"checker.c"
 
 #include"test.c"
 
