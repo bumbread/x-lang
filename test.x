@@ -1,5 +1,5 @@
 {
- var x = 3;
+ var x = 2;
  var y = 5;
 
  if x == y and y != 0 {

@@ -240,7 +240,7 @@ static void lex_next_token(t_lexstate *state) {
   state->last_token.end = end;
 }
 
-static char *get_token_kind_name(t_token_kind kind) {
+static char const *get_token_kind_name(t_token_kind kind) {
   if(kind == TOKEN_INT) {return "INT";}
   else if(kind == TOKEN_IDN) {return "NAME";}
   //else if(kind == TOKEN_FLT) {return "FLOAT";}
@@ -275,5 +275,15 @@ static char *get_token_kind_name(t_token_kind kind) {
   else if(kind == TOKEN_CMP_GEQ) {return ">=";}
   else if(kind == 0) {return "EOF";}
   return "{unknown token}";
+}
+
+static char const *get_token_string(t_token *token) {
+  t_token_kind kind = token->kind;
+  if(kind == TOKEN_IDN) {
+    return token->str_value->str;
+  }
+  //else if(kind == TOKEN_FLT) {return "FLOAT";}
+  //else if(kind == TOKEN_STR) {return "STRING";}
+  return get_token_kind_name(kind);
 }
 

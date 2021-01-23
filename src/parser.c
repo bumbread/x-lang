@@ -174,7 +174,7 @@ static inline bool token_expect(t_lexstate *state, t_token_kind kind) {
   }
   set_errorf("error: expected token %s, got %s", 
              get_token_kind_name(kind), 
-             get_token_kind_name(state->last_token.kind));
+             get_token_string(&state->last_token));
   return false;
 }
 
@@ -539,7 +539,7 @@ static t_ast_node *parse_stmts(t_lexstate *state) {
 
 static bool assert_token_type(t_token *token, t_token_kind kind) {
   if(token->kind != kind) {
-    set_errorf("expected %s, found '%s'", get_token_kind_name(kind), get_token_kind_name(token->kind));
+    set_errorf("expected %s, found '%s'", get_token_kind_name(kind), get_token_string(token));
     return false;
   }
   return true;
@@ -568,7 +568,7 @@ static t_token ast_node_evaluate(t_ast_node *ast_node) {
         }
         else {
           set_errorf("operation %s not permitted on token type %s",
-                     get_token_kind_name(op), get_token_kind_name(value.kind));
+                     get_token_kind_name(op), get_token_string(&value));
         }
       } break;
       case EXPR_BINARY: {
@@ -599,8 +599,8 @@ static t_token ast_node_evaluate(t_ast_node *ast_node) {
         else {
           set_errorf("operation %s not permitted on tokens %s, %s",
                      get_token_kind_name(op), 
-                     get_token_kind_name(left.kind),
-                     get_token_kind_name(right.kind));
+                     get_token_string(&left),
+                     get_token_string(&right));
         }
         return token_eof;
       } break;
@@ -612,7 +612,17 @@ static t_token ast_node_evaluate(t_ast_node *ast_node) {
   return token_eof;
 }
 
-static void ast_node_print_lisp(t_ast_node *ast_node) {
+static void print_at_level(char const *str, int level) {
+  for(int i = 0; i < level; i += 1) {
+    printf(" ");
+  }
+  printf("%s", str);
+}
+
+static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
+  for(int i = 0; i < level; i += 1) {
+    printf(" ");
+  }
   if(ast_node == null) {
     printf("(nul)");
     return;
@@ -629,21 +639,15 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
       } break;
       case EXPR_UNARY: {
         printf("(");
-        if(ast_node->expr.binary_operation.kind == TOKEN_IDN) {
-          printf("%s", ast_node->expr.binary_operation.str_value->str);
-        }
-        else printf("%s", get_token_kind_name(ast_node->expr.binary_operation.kind));
-        ast_node_print_lisp(ast_node->expr.unary_operand);
+        printf("%s", get_token_string(&ast_node->expr.unary_operation));
+        ast_node_print_lisp(ast_node->expr.unary_operand, 0);
         printf(")");
       } break;
       case EXPR_BINARY: {
         printf("(");
-        if(ast_node->expr.binary_operation.kind == TOKEN_IDN) {
-          printf("%s", ast_node->expr.binary_operation.str_value->str);
-        }
-        else printf("%s", get_token_kind_name(ast_node->expr.binary_operation.kind));
-        ast_node_print_lisp(ast_node->expr.binary_operand_left);
-        ast_node_print_lisp(ast_node->expr.binary_operand_right);
+        printf("%s", get_token_string(&ast_node->expr.binary_operation));
+        ast_node_print_lisp(ast_node->expr.binary_operand_left, 0);
+        ast_node_print_lisp(ast_node->expr.binary_operand_right, 0);
         printf(")");
       } break;
       default: set_errorf("undefined operation");
@@ -653,21 +657,27 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
     switch(ast_node->stmt.type) {
       case STMT_IF: {
         printf("(if ");
-        ast_node_print_lisp(ast_node->stmt.condition);
-        ast_node_print_lisp(ast_node->stmt.block);
+        ast_node_print_lisp(ast_node->stmt.condition, 0);
+        printf("\n");
+        ast_node_print_lisp(ast_node->stmt.block, level+1);
         if(ast_node->stmt.else_stmt) {
-          ast_node_print_lisp(ast_node->stmt.else_stmt);
+          printf("\n");
+          ast_node_print_lisp(ast_node->stmt.else_stmt, level+1);
         }
         else {
-          printf("<none>");
+          printf("\n");
+          print_at_level("<none>", level+1);
         }
-        printf(")");
+        printf("\n");
+        print_at_level(")", level);
       } break;
       case STMT_WHILE: {
         printf("(while ");
-        ast_node_print_lisp(ast_node->stmt.condition);
-        ast_node_print_lisp(ast_node->stmt.block);
-        printf(")");
+        ast_node_print_lisp(ast_node->stmt.condition, 0);
+        printf("\n");
+        ast_node_print_lisp(ast_node->stmt.block, level+1);
+        printf("\n");
+        print_at_level(")", level);
       } break;
       case STMT_BREAK: {
         printf("break ");
@@ -680,7 +690,7 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
       } break;
       case STMT_PRINT: {
         printf("(print ");
-        ast_node_print_lisp(ast_node->stmt.value);
+        ast_node_print_lisp(ast_node->stmt.value, 0);
         printf(")");
       } break;
       case STMT_COMPOUND: {
@@ -688,9 +698,10 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
         for(t_ast_node *node = ast_node->stmt.first_stmt;
             node != null;
             node = node->next) {
-          ast_node_print_lisp(node);
+          printf("\n");
+          ast_node_print_lisp(node, level + 1);
         }
-        printf(")");
+        print_at_level(")", level);
       } break;
     }
   }
@@ -698,9 +709,9 @@ static void ast_node_print_lisp(t_ast_node *ast_node) {
     printf("(decl ");
     printf("%s", ast_node->decl.name->str);
     if(null != ast_node->decl.value) {
-      ast_node_print_lisp(ast_node->decl.value);
+      ast_node_print_lisp(ast_node->decl.value, 0);
     }
-    printf(")");
+    print_at_level(")", level);
   }
 }
 

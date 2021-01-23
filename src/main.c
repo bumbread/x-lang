@@ -42,7 +42,7 @@ int main(void) {
   lex_next_token(&state);
   t_ast_node *code = parse_stmts(&state);
   check_errors();
-  ast_node_print_lisp(code);
+  ast_node_print_lisp(code, 0);
   
   return 0;
 }
