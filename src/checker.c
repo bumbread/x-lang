@@ -8,8 +8,7 @@ struct {
 } checker_state;
 
 static void checker_init(void) {
-  stack_init(&checker_state.decl_stack, checker_memory, malloc(checker_memory),
-             sizeof(t_ast_node), DEFAULT_ALIGNMENT);
+  stack_init(&checker_state.decl_stack, checker_memory, malloc(checker_memory), sizeof(t_ast_node));
 }
 
 static t_ast_node *get_type_from_decl(t_intern const *name) {
@@ -20,6 +19,25 @@ static t_ast_node *get_type_from_decl(t_intern const *name) {
     }
   }
   return null;
+}
+
+static bool are_types_equal(t_ast_node *type1, t_ast_node *type2) {
+  assert(type1->type == NODE_TYPE);
+  assert(type2->type == NODE_TYPE);
+  if(type1->type_name.type == type2->type_name.type) {
+    switch(type1->type_name.type) {
+      case TYPE_PRIMITIVE: return type1->type_name.primitive == type2->type_name.primitive;
+      // todo
+    }
+  }
+  return false;
+}
+
+static void expect_primitive_type(t_ast_node *node, t_primitive_type primitive) {
+  assert(node->type == NODE_TYPE);
+  if(node->type_name.type != TYPE_PRIMITIVE) {
+    set_errorf("expected type %s, got %s\n", "", "");
+  }
 }
 
 static void ast_check_and_infer(t_ast_node *node) {

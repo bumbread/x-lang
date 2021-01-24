@@ -33,14 +33,22 @@ struct {
 } typedef t_ast_expr;
 
 enum {
+  TYPE_PRIMITIVE,
+  // TYPE_POINTER,
+  // TYPE_SLICE,
+} typedef t_value_type;
+
+enum {
   EXPR_VOID,
   EXPR_INT,
   EXPR_BOOL,
-} typedef t_value_type;
+} typedef t_primitive_type;
 
 struct {
   t_value_type type;
   union {
+    // primitive types
+    t_primitive_type primitive;
     // pointers, arrays.
     t_ast_node *base_type;
     // structs, unions
@@ -107,7 +115,6 @@ struct t_ast_node_ {
   };
 };
 
-static t_arena ast_arena;
 static t_intern const *keyword_if;
 static t_intern const *keyword_else;
 static t_intern const *keyword_while;
@@ -131,11 +138,10 @@ static t_ast_node *type_bool;
 static t_ast_node *type_void;
 
 static t_ast_node *alloc_ast_node(void) {
-  return arena_alloc(&ast_arena, sizeof(t_ast_node), 8);
+  return global_alloc(sizeof(t_ast_node));
 }
 
 static void parser_init_memory(ptr buffer_size, void *buffer) {
-  arena_init(&ast_arena, buffer_size, buffer);
   keyword_if       = intern_cstring("if");
   keyword_else     = intern_cstring("else");
   keyword_while    = intern_cstring("while");
@@ -149,20 +155,16 @@ static void parser_init_memory(ptr buffer_size, void *buffer) {
   keyword_or       = intern_cstring("or");
   
   keyword_var      = intern_cstring("var");
-#if 0
-  keyword_byte     = intern_cstring("byte");
-  keyword_int      = intern_cstring("int");
-  keyword_float    = intern_cstring("float");
-  keyword_string   = intern_cstring("string");
-#endif
   
   type_int = alloc_ast_node();
   type_int->type = NODE_TYPE;
-  type_int->type_name.type = EXPR_INT;
+  type_int->type_name.type = TYPE_PRIMITIVE;
+  type_int->type_name.primitive = EXPR_INT;
   
   type_bool = alloc_ast_node();
   type_bool->type = NODE_TYPE;
-  type_bool->type_name.type = EXPR_BOOL;
+  type_bool->type_name.type = TYPE_PRIMITIVE;
+  type_bool->type_name.primitive = EXPR_BOOL;
 }
 
 static inline bool token_is(t_lexstate *state, t_token_kind kind) {

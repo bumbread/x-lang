@@ -7,15 +7,14 @@
 #include<stdlib.h>
 #include<stdint.h>
 
-
 #include"common.c"
 #include<stdio.h>
 #include"memory.c"
 #include"string.c"
+
 #include"lexer.c"
 #include"parser.c"
 #include"checker.c"
-
 #include"test.c"
 
 int main(void) {

@@ -16,10 +16,9 @@ struct t_string_buffer_ {
 } typedef t_string_buffer;
 
 static t_string_buffer *first_buffer;
-static void *(*static_allocate)(ptr size);
 
 static t_string_buffer *buffer_create_and_init(void) {
-  t_string_buffer *buffer = static_allocate(string_buffer_size);
+  t_string_buffer *buffer = x_malloc(string_buffer_size);
   arena_init(&buffer->arena, string_buffer_size, buffer);
   void *test = arena_alloc(&buffer->arena, sizeof(t_string_buffer), 1);
   assert(test == buffer);
@@ -28,8 +27,7 @@ static t_string_buffer *buffer_create_and_init(void) {
   return buffer;
 }
 
-static void init_interns(void *(*static_allocate_f)(ptr size)) {
-  static_allocate = static_allocate_f;
+static void init_interns() {
   first_buffer = buffer_create_and_init();
 }
 
