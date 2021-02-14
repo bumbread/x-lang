@@ -144,6 +144,14 @@ static void parser_init_memory(ptr buffer_size, void *buffer) {
     
     keyword_and      = intern_cstring("and");
     keyword_or       = intern_cstring("or");
+    
+    
+    keyword_bool     = intern_cstring("bool");
+    keyword_byte     = intern_cstring("byte");
+    keyword_int      = intern_cstring("int");
+    keyword_float    = intern_cstring("float");
+    keyword_string   = intern_cstring("string");
+    
 }
 
 static inline bool token_is(t_lexstate *state, t_token_kind kind) {
@@ -421,33 +429,38 @@ static t_ast_node *parse_type(t_lexstate *state) {
     t_ast_node *node = alloc_ast_node();
     node->type = AST_type_node;
     node->type_cat = TYPE_none;
+    
     while(true) {
-        if(token_match_identifier(state, keyword_int)) {
-            if(node->type_cat != TYPE_none) {
+        if(token_is_identifier(state, keyword_int)) {
+            if(node->type_cat == TYPE_none) {
                 node->type_cat = TYPE_primitive;
+                lex_next_token(state);
             }
-            else set_errorf("unexpected primitive type");
+            else break;
             node->type_primitive = state->last_token;
         }
-        else if(token_match_identifier(state, keyword_bool)) {
-            if(node->type_cat != TYPE_none) {
+        else if(token_is_identifier(state, keyword_bool)) {
+            if(node->type_cat == TYPE_none) {
                 node->type_cat = TYPE_primitive;
+                lex_next_token(state);
             }
-            else set_errorf("unexpected primitive type");
+            else break;
             node->type_primitive = state->last_token;
         }
-        else if(token_match_identifier(state, keyword_byte)) {
-            if(node->type_cat != TYPE_none) {
+        else if(token_is_identifier(state, keyword_byte)) {
+            if(node->type_cat == TYPE_none) {
                 node->type_cat = TYPE_primitive;
+                lex_next_token(state);
             }
-            else set_errorf("unexpected primitive type");
+            else break;
             node->type_primitive = state->last_token;
         }
         else if(token_match_identifier(state, keyword_float)) {
-            if(node->type_cat != TYPE_none) {
+            if(node->type_cat == TYPE_none) {
                 node->type_cat = TYPE_primitive;
+                lex_next_token(state);
             }
-            else set_errorf("unexpected primitive type");
+            else break;
             node->type_primitive = state->last_token;
         }
         else if(token_match(state, '$')) {
@@ -503,7 +516,7 @@ static t_ast_node *parse_declaration(t_lexstate *state) {
     t_token name = state->last_token;
     if(token_expect(state, TOKEN_IDN)) {
         node->decl_name = name.str_value;
-        if(token_expect(state, '=')) {
+        if(token_match(state, '=')) {
             t_ast_node *value = parse_expr(state);
             node->decl_value = value;
         }

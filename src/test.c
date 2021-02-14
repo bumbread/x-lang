@@ -23,7 +23,7 @@ static void test_lexing(void) {
     
     // operators.
     t_lexstate state;
-    char const *string = "+ - == <= > < != !";
+    char const *string = "+ - == <= > < != ! <-";
     lex_init(&state, string);
     test_token_op('+');
     test_token_op('-');
@@ -33,6 +33,7 @@ static void test_lexing(void) {
     test_token_op('<');
     test_token_op(TOKEN_CMP_NEQ);
     test_token_op('!');
+    test_token_op(TOKEN_LEFT_ARROW);
     
     
     // integer literals

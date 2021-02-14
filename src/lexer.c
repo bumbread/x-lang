@@ -227,15 +227,12 @@ static void lex_next_token(t_lexstate *state) {
             if(lex_match_char(state, '=')) {
                 state->last_token.kind = TOKEN_CMP_LEQ;
             }
+            if(lex_match_char(state, '-')) {
+                state->last_token.kind = TOKEN_LEFT_ARROW;
+            }
         }
         else if(*state->stream == 0) {
             state->last_token.kind = TOKEN_EOF;
-        }
-        else if(lex_match_char(state, '-')) {
-            state->last_token.kind = '-';
-            if(lex_match_char(state, '<')) {
-                state->last_token.kind = TOKEN_LEFT_ARROW;
-            }
         }
         else {
             state->last_token.kind = *state->stream;
@@ -280,6 +277,7 @@ static char const *get_token_kind_name(t_token_kind kind) {
     else if(kind == TOKEN_CMP_EQ) {return "==";}
     else if(kind == TOKEN_CMP_LEQ) {return "<=";}
     else if(kind == TOKEN_CMP_GEQ) {return ">=";}
+    else if(kind == TOKEN_LEFT_ARROW) {return "<-";}
     else if(kind == 0) {return "EOF";}
     return "{unknown token}";
 }
