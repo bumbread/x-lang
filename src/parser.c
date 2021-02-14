@@ -678,22 +678,25 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
     }
     if(ast_node->type == AST_value_node) {
         if(ast_node->value_token.kind == TOKEN_INT) {
-            printf(" %llu ", ast_node->value_token.int_value);
+            printf("%llu", ast_node->value_token.int_value);
         }
         else if(ast_node->value_token.kind == TOKEN_IDN) {
-            printf(" %s ", ast_node->value_token.str_value->str);
+            printf("%s", ast_node->value_token.str_value->str);
         }
     }
     if(ast_node->type == AST_unary_expr_node) {
         printf("(");
         printf("%s", get_token_string(&ast_node->unary_op));
+        printf(" ");
         ast_node_print_lisp(ast_node->unary_opr1, 0);
         printf(")");
     }
     if(ast_node->type == AST_binary_expr_node) {
         printf("(");
         printf("%s", get_token_string(&ast_node->binary_op));
+        printf(" ");
         ast_node_print_lisp(ast_node->binary_opr1, 0);
+        printf(" ");
         ast_node_print_lisp(ast_node->binary_opr2, 0);
         printf(")");
     }
@@ -754,6 +757,7 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
         printf("(decl ");
         printf("%s", ast_node->decl_name->str);
         if(null != ast_node->decl_value) {
+            printf(" ");
             ast_node_print_lisp(ast_node->decl_value, 0);
         }
         print_at_level(")", level);
