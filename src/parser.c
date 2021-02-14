@@ -163,7 +163,7 @@ static inline bool token_expect(t_lexstate *state, t_token_kind kind) {
         lex_next_token(state);
         return true;
     }
-    set_errorf("error: expected token %s, got %s", 
+    set_errorf("expected token %s, got %s", 
                get_token_kind_name(kind),
                get_token_string(&state->last_token));
     return false;
@@ -426,28 +426,28 @@ static t_ast_node *parse_type(t_lexstate *state) {
             if(node->type_cat != TYPE_none) {
                 node->type_cat = TYPE_primitive;
             }
-            else set_errorf("error: unexpected primitive type");
+            else set_errorf("unexpected primitive type");
             node->type_primitive = state->last_token;
         }
         else if(token_match_identifier(state, keyword_bool)) {
             if(node->type_cat != TYPE_none) {
                 node->type_cat = TYPE_primitive;
             }
-            else set_errorf("error: unexpected primitive type");
+            else set_errorf("unexpected primitive type");
             node->type_primitive = state->last_token;
         }
         else if(token_match_identifier(state, keyword_byte)) {
             if(node->type_cat != TYPE_none) {
                 node->type_cat = TYPE_primitive;
             }
-            else set_errorf("error: unexpected primitive type");
+            else set_errorf("unexpected primitive type");
             node->type_primitive = state->last_token;
         }
         else if(token_match_identifier(state, keyword_float)) {
             if(node->type_cat != TYPE_none) {
                 node->type_cat = TYPE_primitive;
             }
-            else set_errorf("error: unexpected primitive type");
+            else set_errorf("unexpected primitive type");
             node->type_primitive = state->last_token;
         }
         else if(token_match(state, '$')) {
@@ -628,7 +628,7 @@ static t_token ast_expr_node_evaluate(t_ast_node *ast_node) {
                     result.int_value = left.int_value * right.int_value;
                 } break;
                 case '/': {
-                    if(right.int_value == 0) set_errorf("error: division by zero");
+                    if(right.int_value == 0) set_errorf("division by zero");
                     else result.int_value = left.int_value / right.int_value;
                 } break;
             }
