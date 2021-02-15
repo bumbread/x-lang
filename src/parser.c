@@ -432,36 +432,36 @@ static t_ast_node *parse_type(t_lexstate *state) {
     
     while(true) {
         if(token_is_identifier(state, keyword_int)) {
+            node->type_primitive = state->last_token;
             if(node->type_cat == TYPE_none) {
                 node->type_cat = TYPE_primitive;
                 lex_next_token(state);
             }
             else break;
-            node->type_primitive = state->last_token;
         }
         else if(token_is_identifier(state, keyword_bool)) {
+            node->type_primitive = state->last_token;
             if(node->type_cat == TYPE_none) {
                 node->type_cat = TYPE_primitive;
                 lex_next_token(state);
             }
             else break;
-            node->type_primitive = state->last_token;
         }
         else if(token_is_identifier(state, keyword_byte)) {
+            node->type_primitive = state->last_token;
             if(node->type_cat == TYPE_none) {
                 node->type_cat = TYPE_primitive;
                 lex_next_token(state);
             }
             else break;
-            node->type_primitive = state->last_token;
         }
         else if(token_match_identifier(state, keyword_float)) {
+            node->type_primitive = state->last_token;
             if(node->type_cat == TYPE_none) {
                 node->type_cat = TYPE_primitive;
                 lex_next_token(state);
             }
             else break;
-            node->type_primitive = state->last_token;
         }
         else if(token_match(state, '$')) {
             t_ast_node *pnode = alloc_ast_node();
@@ -476,7 +476,7 @@ static t_ast_node *parse_type(t_lexstate *state) {
             }
             t_ast_node *pnode = alloc_ast_node();
             pnode->type = AST_type_node;
-            pnode->type_cat = TYPE_pointer;
+            pnode->type_cat = TYPE_slice;
             pnode->base_type = node;
             node = pnode;
         }
@@ -485,6 +485,12 @@ static t_ast_node *parse_type(t_lexstate *state) {
                 return null;
             }
             t_ast_node *decl_list = alloc_ast_node();
+            t_ast_node *function_node = alloc_ast_node();
+            function_node->type = AST_type_node;
+            function_node->type_cat = TYPE_function;
+            function_node->function_parameters = decl_list;
+            function_node->function_return_type = node;
+            node = function_node;
             while(true) {
                 t_type_node *parameter = parse_type(state);
                 node_attach_next(decl_list, parameter);
@@ -497,6 +503,7 @@ static t_ast_node *parse_type(t_lexstate *state) {
                     return null;
                 }
             }
+            printf("a");
             if(!token_expect(state, ')')) {
                 return null;
             }
@@ -755,11 +762,47 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
     }
     else if(ast_node->type == AST_decl_node) {
         printf("(decl ");
-        printf("%s", ast_node->decl_name->str);
+        printf("%s\n", ast_node->decl_name->str);
+        ast_node_print_lisp(ast_node->decl_type, level+1);
+        printf("\n");
         if(null != ast_node->decl_value) {
             printf(" ");
             ast_node_print_lisp(ast_node->decl_value, 0);
         }
         print_at_level(")", level);
+    }
+    else if(ast_node->type == AST_type_node) {
+        switch(ast_node->type_cat) {
+            case TYPE_primitive: {
+                printf("(type %s)", get_token_string(&ast_node->type_primitive));
+            } break;
+            case TYPE_pointer: {
+                printf("(type pointer to ");
+                ast_node_print_lisp(ast_node->base_type, 0);
+                printf(")");
+            } break;
+            case TYPE_slice: {
+                printf("(type slice of");
+                ast_node_print_lisp(ast_node->base_type, 0);
+                printf(")");
+            } break;
+            case TYPE_function: {
+                printf("(type function returning");
+                ast_node_print_lisp(ast_node->function_return_type, level);
+                printf("\n");
+                for(t_ast_node *param = ast_node->function_parameters->first;
+                    param != null;
+                    param = param->next) {
+                    print_at_level("param: ", level+1);
+                    ast_node_print_lisp(param, 0);
+                    printf("\n");
+                }
+                print_at_level(")", level);
+            } break;
+            default: {
+                printf("(type ERROR");
+                print_at_level(")", level);
+            }
+        }
     }
 }
