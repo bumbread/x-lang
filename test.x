@@ -19,10 +19,11 @@
   a = $x;
   @a = 3;
   a[2][3] = 3[w];
-  $@a[2]
+  $@a[2];
 
   {
     :float celcius = 50;
-    :float farenheit = 2;
+    :float farenheit;
+	farenheit = celcius + 2 * $a[40];
   }
 }

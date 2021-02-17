@@ -534,7 +534,6 @@ static t_ast_node *parse_type(t_lexstate *state) {
                     return null;
                 }
             }
-            printf("a");
             if(!token_expect(state, ')')) {
                 return null;
             }
@@ -698,25 +697,16 @@ static t_token ast_expr_node_evaluate(t_ast_node *ast_node) {
     return token_eof;
 }
 
-static void print_at_level(char const *str, int level) {
+static void print_level(int level) {
     for(int i = 0; i < level; i += 1) {
         printf(" ");
     }
-    printf("%s", str);
 }
 
 static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
     if(ast_node == null) {
         printf("ERROR: printing null node.\n");
     }
-    for(int i = 0; i < level; i += 1) {
-        printf(" ");
-    }
-    if(ast_node == null) {
-        printf("(nul)");
-        return;
-    }
-    
     if(ast_node->type == AST_value_node) {
         if(ast_node->value_token.kind == TOKEN_INT) {
             printf("%llu", ast_node->value_token.int_value);
@@ -745,96 +735,100 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
         switch(ast_node->stmt_cat) {
             case STMT_if: {
                 printf("(if ");
-                ast_node_print_lisp(ast_node->if_condition, 0);
-                printf("\n");
+                ast_node_print_lisp(ast_node->if_condition, level+1);
                 ast_node_print_lisp(ast_node->if_true_block, level+1);
                 if(ast_node->if_false_block != null) {
-                    printf("\n");
                     ast_node_print_lisp(ast_node->if_false_block, level+1);
                 }
-                else {
-                    printf("\n");
-                    print_at_level("<none>", level+1);
-                }
                 printf("\n");
-                print_at_level(")", level);
+                print_level(level);
+                printf(")");
             } break;
             case STMT_while: {
                 printf("(while ");
-                ast_node_print_lisp(ast_node->while_condition, 0);
-                printf("\n");
+                ast_node_print_lisp(ast_node->while_condition, level+1);
                 ast_node_print_lisp(ast_node->while_block, level+1);
                 printf("\n");
-                print_at_level(")", level);
+                print_level(level);
+                printf(")");
             } break;
             case STMT_break: {
-                printf("break ");
+                printf("break");
             } break;
             case STMT_return: {
-                printf("return ");
+                printf("return");
             } break;
             case STMT_continue: {
-                printf("continue ");
+                printf("continue");
             } break;
             case STMT_print: {
                 printf("(print ");
-                ast_node_print_lisp(ast_node->print_value, 0);
+                printf("\n");
+                print_level(level+1);
+                ast_node_print_lisp(ast_node->print_value, level+1);
+                printf("\n");
+                print_level(level);
                 printf(")");
             } break;
         }
     }
     else if(ast_node->type == AST_stmt_block) {
-        printf("(compound ");
+        printf("\n");
+        print_level(level);
+        printf("(compound");
         for(t_ast_node *node = ast_node->first;
             node != null;
             node = node->next) {
+            printf("\n");
+            print_level(level+1);
             ast_node_print_lisp(node, level + 1);
         }
         printf("\n");
-        print_at_level(")", level);
+        print_level(level);
+        printf(")");
     }
     else if(ast_node->type == AST_decl_node) {
-        printf("(decl ");
-        printf("%s\n", ast_node->decl_name->str);
+        printf("(decl");
+        printf(" %s ", ast_node->decl_name->str);
         ast_node_print_lisp(ast_node->decl_type, level+1);
-        printf("\n");
         if(null != ast_node->decl_value) {
             printf(" ");
-            ast_node_print_lisp(ast_node->decl_value, 0);
+            ast_node_print_lisp(ast_node->decl_value, level+1);
         }
-        print_at_level(")", level);
+        printf(")");
     }
     else if(ast_node->type == AST_type_node) {
         switch(ast_node->type_cat) {
             case TYPE_primitive: {
-                printf("(type %s)", get_token_string(&ast_node->type_primitive));
+                printf("%s", get_token_string(&ast_node->type_primitive));
             } break;
             case TYPE_pointer: {
-                printf("(type pointer to ");
+                printf("(pointer to ");
                 ast_node_print_lisp(ast_node->base_type, 0);
                 printf(")");
             } break;
             case TYPE_slice: {
-                printf("(type slice of");
+                printf("(slice of ");
                 ast_node_print_lisp(ast_node->base_type, 0);
                 printf(")");
             } break;
             case TYPE_function: {
-                printf("(type function returning");
-                ast_node_print_lisp(ast_node->function_return_type, level);
-                printf("\n");
+                printf("(function returning ");
+                ast_node_print_lisp(ast_node->function_return_type, level+1);
                 for(t_ast_node *param = ast_node->function_parameters->first;
                     param != null;
                     param = param->next) {
-                    print_at_level("param: ", level+1);
-                    ast_node_print_lisp(param, 0);
                     printf("\n");
+                    print_level(level);
+                    printf("param: ");
+                    ast_node_print_lisp(param, level+1);
                 }
-                print_at_level(")", level);
+                printf("\n");
+                print_level(level);
+                printf(")");
             } break;
             default: {
                 printf("(type ERROR");
-                print_at_level(")", level);
             }
         }
     }
