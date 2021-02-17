@@ -28,15 +28,23 @@ struct {
         i64 int_value;
         t_intern const *str_value;
     };
+    u64 line;
+    u64 offset;
 } typedef t_token;
 
 struct {
+    char const *filename;
     char const *stream;
     t_token last_token;
+    u64 line;
+    u64 offset;
 } typedef t_lexstate;
 
-static void lex_init(t_lexstate *state, char const *stream) {
+static void lex_init(t_lexstate *state, char const *filename, char const *stream) {
+    state->filename = filename;
     state->stream = stream;
+    state->line = 1;
+    state->offset = 1;
     t_token eof_token; // to be removed later
     eof_token.start = eof_token.end = null;
     eof_token.kind = TOKEN_EOF;
@@ -44,7 +52,14 @@ static void lex_init(t_lexstate *state, char const *stream) {
 }
 
 static inline char const lex_next_char(t_lexstate *state) {
-    return *state->stream++;
+    char result = *state->stream;
+    state->stream += 1;
+    state->offset += 1;
+    if(result == '\n') {
+        state->line += 1;
+        state->offset = 0;
+    }
+    return result;
 }
 
 static inline bool lex_match_char(t_lexstate *state, char c) {
@@ -107,7 +122,7 @@ static char lex_string_escape(char const *stream, char const **end) {
     if(is_digit(16, *stream)) {
         u64 result = lex_integer(16, stream, &stream);
         if(result > 0xff) {
-            set_errorf("value %x is unacceptable for a char literal", result);
+            push_errorf("value %x is unacceptable for a char literal", result);
         }
         val = (char)result;
     }
@@ -142,7 +157,7 @@ static void lex_next_token(t_lexstate *state) {
         // searching the '.' to find whether the number is flt
         while(isdigit(*state->stream)) state->stream+=1;
         if(*state->stream == '.') {
-            set_errorf("unexpected symbol '.'");
+            push_errorf("unexpected symbol '.'");
 #if 0
             state->stream = start;
             f64 val = strtod(start, (char **)&state->stream);
@@ -173,17 +188,17 @@ static void lex_next_token(t_lexstate *state) {
             state->stream += 1;
         }
         else {
-            set_errorf("value %x is unacceptable for a char literal", *state->stream);
+            push_errorf("value %x is unacceptable for a char literal", *state->stream);
         }
         state->last_token.kind = TOKEN_INT;
         state->last_token.subkind = TOKEN_SUBKIND_CHAR;
         state->last_token.int_value = val;
         if(!lex_match_char(state, '\'')) {
-            set_errorf("expected a char literal to close");
+            push_errorf("expected a char literal to close");
         }
     }
     else if(lex_match_char(state, '"')) { // string literal
-        set_errorf("unexpected symbol '\"'");
+        push_errorf("unexpected symbol '\"'");
 #if 0    
         string_builder_start();
         while(true) {
@@ -242,6 +257,8 @@ static void lex_next_token(t_lexstate *state) {
     char const *end = state->stream;
     state->last_token.start = start;
     state->last_token.end = end;
+    state->last_token.line = state->line;
+    state->last_token.offset = state->offset;
 }
 
 static char const *get_token_kind_name(t_token_kind kind) {

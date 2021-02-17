@@ -18,6 +18,8 @@
 #include"test.c"
 
 int main(void) {
+    init_errors(20);
+    
     test_lexing();
     test_interns();
     
@@ -38,14 +40,16 @@ int main(void) {
     fread(buf, input_size, 1, input);
     
     t_lexstate state;
-    lex_init(&state, (char *)buf);
+    lex_init(&state, filename, (char *)buf);
     lex_next_token(&state);
     t_ast_node *code = parse_stmts(&state);
     check_errors();
     
-    printf("\n");
-    ast_node_print_lisp(code, 0);
-    printf("\n");
+    if(now_errors != 0) {
+        printf("\n");
+        ast_node_print_lisp(code, 0);
+        printf("\n");
+    }
     
     return 0;
 }

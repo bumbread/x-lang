@@ -13,17 +13,21 @@
     }
   }
 
-  :int<-(int, int	, int) b;
+  :int<-(int, int, int) b;
   :int$ a;
 
   a = $x;
   @a = 3;
   a[2][3] = 3[w];
-  $@a[2];
+  $@a[2] = 3;
 
   {
     :float celcius = 50;
     :float farenheit;
 	farenheit = celcius + 2 * $a[40];
   }
+  
+  a;
+  b;
+  c;
 }

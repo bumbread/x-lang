@@ -20,26 +20,35 @@ u64      typedef ptr;
 #define  gb      1024*mb
 
 void panicf(char *message, ...) {
-  va_list args;
-  va_start(args, message);
-  vprintf(message, args);
-  va_end(args);
-  exit(1);
+    va_list args;
+    va_start(args, message);
+    vprintf(message, args);
+    va_end(args);
+    exit(1);
 }
 
-static bool error = false;
-static char last_error[1024];
-void set_errorf(char const *message, ...) {
-  va_list args;
-  va_start(args, message);
-  vsprintf(last_error, message, args);
-  va_end(args);
-  error = true;
+static int max_errors = -1;
+static int now_errors = 0;
+static char (*errors)[1024];
+
+void init_errors(int set_max_errors) {
+    max_errors = set_max_errors;
+    errors = malloc(set_max_errors * sizeof(char[1024]));
+}
+
+void push_errorf(char const *message, ...) {
+    if(now_errors < max_errors) {
+        va_list args;
+        va_start(args, message);
+        vsprintf(errors[now_errors], message, args);
+        va_end(args);
+        now_errors += 1;
+    }
+    else exit(1);
 }
 
 void check_errors(void) {
-  if(error == true) {
-    printf("error: %s\n", last_error);
-    error = false;
-  }
+    for(int error_index = 0; error_index < now_errors; error_index += 1) {
+        printf("%s\n", errors[error_index]);
+    }
 }

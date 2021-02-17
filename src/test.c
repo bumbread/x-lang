@@ -24,7 +24,7 @@ static void test_lexing(void) {
     // operators.
     t_lexstate state;
     char const *string = "+ - == <= > < != ! <-";
-    lex_init(&state, string);
+    lex_init(&state, "", string);
     test_token_op('+');
     test_token_op('-');
     test_token_op(TOKEN_CMP_EQ);
@@ -38,7 +38,7 @@ static void test_lexing(void) {
     
     // integer literals
     string = " 123\n   0123 00 ";
-    lex_init(&state, string);
+    lex_init(&state, "", string);
     test_token_int(123);
     test_token_int(123);
     test_token_int(0);
@@ -56,7 +56,7 @@ static void test_lexing(void) {
     
     // char literals
     string = "  '2'      '\\n'  '\"' '\\10'";
-    lex_init(&state, string);
+    lex_init(&state, "", string);
     test_token_chr('2');
     test_token_chr('\n');
     test_token_chr('"');

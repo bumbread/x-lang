@@ -166,14 +166,23 @@ static inline bool token_match(t_lexstate *state, t_token_kind kind) {
     return false;
 }
 
+static inline void print_parse_error(t_lexstate *state, char const *string) {
+    push_errorf("%s(%d, %d): %s",
+                state->filename,
+                state->line, state->offset,
+                string);
+}
+
 static inline bool token_expect(t_lexstate *state, t_token_kind kind) {
     if(state->last_token.kind == kind) {
         lex_next_token(state);
         return true;
     }
-    set_errorf("expected token %s, got %s", 
-               get_token_kind_name(kind),
-               get_token_string(&state->last_token));
+    push_errorf("%s(%d, %d): expected token %s, got %s",
+                state->filename,
+                state->line, state->offset,
+                get_token_kind_name(kind),
+                get_token_string(&state->last_token));
     return false;
 }
 
@@ -198,7 +207,7 @@ static inline bool token_expect_identifier(t_lexstate *state, t_intern const *st
         lex_next_token(state);
         return true;
     }
-    set_errorf("expected keyword %s, got %s", state->last_token.str_value->str, str->str);
+    push_errorf("expected keyword %s, got %s", state->last_token.str_value->str, str->str);
     return false;
 }
 
@@ -398,6 +407,9 @@ static t_ast_node *parse_assignment(t_lexstate *state) {
             node->binary_opr1 = lhs;
             node->binary_opr2 = rhs;
             lhs = node;
+        }
+        else {
+            print_parse_error(state, "expected assignment");
         }
     }
     return lhs;
@@ -628,7 +640,7 @@ static t_ast_node *parse_stmts(t_lexstate *state) {
 
 static bool assert_token_type(t_token *token, t_token_kind kind) {
     if(token->kind != kind) {
-        set_errorf("expected %s, found '%s'", get_token_kind_name(kind), get_token_string(token));
+        push_errorf("expected %s, found '%s'", get_token_kind_name(kind), get_token_string(token));
         return false;
     }
     return true;
@@ -637,7 +649,7 @@ static bool assert_token_type(t_token *token, t_token_kind kind) {
 static t_token token_eof = {.kind = TOKEN_EOF};
 static t_token ast_expr_node_evaluate(t_ast_node *ast_node) {
     if(ast_node == null) {
-        set_errorf("empty expression");
+        push_errorf("empty expression");
         return token_eof;
     }
     
@@ -654,8 +666,8 @@ static t_token ast_expr_node_evaluate(t_ast_node *ast_node) {
             }
         }
         else {
-            set_errorf("operation %s not permitted on token type %s",
-                       get_token_kind_name(op), get_token_string(&value));
+            push_errorf("operation %s not permitted on token type %s",
+                        get_token_kind_name(op), get_token_string(&value));
         }
     }
     else if(ast_node->type == AST_binary_expr_node) {
@@ -677,22 +689,22 @@ static t_token ast_expr_node_evaluate(t_ast_node *ast_node) {
                     result.int_value = left.int_value * right.int_value;
                 } break;
                 case '/': {
-                    if(right.int_value == 0) set_errorf("division by zero");
+                    if(right.int_value == 0) push_errorf("division by zero");
                     else result.int_value = left.int_value / right.int_value;
                 } break;
             }
             return result;
         }
         else {
-            set_errorf("operation %s not permitted on tokens %s, %s",
-                       get_token_kind_name(op), 
-                       get_token_string(&left),
-                       get_token_string(&right));
+            push_errorf("operation %s not permitted on tokens %s, %s",
+                        get_token_kind_name(op), 
+                        get_token_string(&left),
+                        get_token_string(&right));
         }
         return token_eof;
     }
     else {
-        set_errorf("not an expression");
+        push_errorf("not an expression");
     }
     return token_eof;
 }
