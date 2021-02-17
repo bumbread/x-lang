@@ -230,8 +230,8 @@ static t_ast_node *parse_expr1(t_lexstate *state) {
 }
 
 static t_ast_node *parse_expr2(t_lexstate *state) {
-    // deref, addressing op, function calls here (TODO)
     t_token op_token = state->last_token;
+    // sub
     if(token_match(state, '-')) {
         t_ast_node *node = alloc_ast_node();
         node->type = AST_unary_expr_node;
@@ -239,8 +239,39 @@ static t_ast_node *parse_expr2(t_lexstate *state) {
         node->unary_op = op_token;
         return node;
     }
+    // address-of
+    else if(token_match(state, '$')) {
+        t_ast_node *node = alloc_ast_node();
+        node->type = AST_unary_expr_node;
+        node->unary_opr1 = parse_expr2(state);
+        node->unary_op = op_token;
+        return node;
+    }
+    // deref
+    else if(token_match(state, '@')) {
+        t_ast_node *node = alloc_ast_node();
+        node->type = AST_unary_expr_node;
+        node->unary_opr1 = parse_expr2(state);
+        node->unary_op = op_token;
+        return node;
+    }
     else {
-        return parse_expr1(state);
+        t_ast_node *result = parse_expr1(state);
+        while(true) {
+            op_token = state->last_token;
+            if(token_match(state, '[')) {
+                t_ast_node *node = alloc_ast_node();
+                node->type = AST_binary_expr_node;
+                node->binary_opr1 = result;
+                node->binary_opr2 = parse_expr(state);
+                node->binary_op = op_token;
+                token_expect(state, ']');
+                
+                result = node;
+            }
+            else break;
+        }
+        return result;
     }
 }
 
@@ -455,7 +486,7 @@ static t_ast_node *parse_type(t_lexstate *state) {
             }
             else break;
         }
-        else if(token_match_identifier(state, keyword_float)) {
+        else if(token_is_identifier(state, keyword_float)) {
             node->type_primitive = state->last_token;
             if(node->type_cat == TYPE_none) {
                 node->type_cat = TYPE_primitive;
@@ -569,9 +600,8 @@ static t_ast_node *parse_stmt(t_lexstate *state) {
         node->print_value = parse_expr(state);
         token_expect(state, ';');
     }
-    else if(token_match(state, '{')) {
+    else if(token_is(state, '{')) {
         node = parse_stmts(state);
-        token_expect(state, '}');
     }
     else {
         node = parse_assignment(state);
@@ -676,6 +706,9 @@ static void print_at_level(char const *str, int level) {
 }
 
 static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
+    if(ast_node == null) {
+        printf("ERROR: printing null node.\n");
+    }
     for(int i = 0; i < level; i += 1) {
         printf(" ");
     }
@@ -683,6 +716,7 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
         printf("(nul)");
         return;
     }
+    
     if(ast_node->type == AST_value_node) {
         if(ast_node->value_token.kind == TOKEN_INT) {
             printf("%llu", ast_node->value_token.int_value);
@@ -754,7 +788,6 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
         for(t_ast_node *node = ast_node->first;
             node != null;
             node = node->next) {
-            printf("\n");
             ast_node_print_lisp(node, level + 1);
         }
         printf("\n");

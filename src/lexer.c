@@ -257,6 +257,7 @@ static char const *get_token_kind_name(t_token_kind kind) {
     else if(kind == '+') {return "+";}
     else if(kind == '*') {return "*";}
     else if(kind == '/') {return "/";}
+    else if(kind == '@') {return "@";}
     else if(kind == '$') {return "$";}
     else if(kind == '#') {return "#";}
     else if(kind == '%') {return "%";}

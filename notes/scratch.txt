@@ -60,6 +60,8 @@ note: the declared type will be distinct
  int b = function(2);
 
 
+dereference: @pointer = value;
+address-of : ptr = $value;
 
 
 
