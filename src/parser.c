@@ -39,6 +39,10 @@ enum {
     BINARY_neq,
     BINARY_and,
     BINARY_or,
+    BINARY_add_ass,
+    BINARY_sub_ass,
+    BINARY_mul_ass,
+    BINARY_div_ass,
 } typedef t_binary_op_cat;
 
 enum {
@@ -557,28 +561,75 @@ static t_ast_node *parse_expr(t_lexstate *state) {
 
 /* STATEMENTS PARSER */
 
+
 static t_ast_node *parse_assignment(t_lexstate *state) {
-    t_ast_node *lhs = parse_expr(state);
-    if(null != lhs) {
-        if(token_is(state, '=')) {
+    t_ast_node *operand_left = parse_expr7(state);
+    if(null != operand_left) {
+        if(token_is(state, TOKEN_ADD_ASS)) {
+            
             t_token op_token = state->last_token;
             lex_next_token(state);
-            
-            t_ast_node *rhs = parse_expr(state);
-            
+            t_ast_node *operand_right = parse_expr7(state);
             t_ast_node *node = alloc_ast_node();
             node->type = AST_binary_expr_node;
-            node->binary_op = '=';
-            node->binary_opr1 = lhs;
-            node->binary_opr2 = rhs;
-            lhs = node;
+            node->binary_op = BINARY_add_ass;
+            node->binary_opr1 = operand_left;
+            node->binary_opr2 = operand_right;
+            operand_left = node;
         }
-        else {
-            parse_error(state, "expected assignment");
+        else if(token_is(state, TOKEN_SUB_ASS)) {
+            
+            t_token op_token = state->last_token;
+            lex_next_token(state);
+            t_ast_node *operand_right = parse_expr7(state);
+            t_ast_node *node = alloc_ast_node();
+            node->type = AST_binary_expr_node;
+            node->binary_op = BINARY_sub_ass;
+            node->binary_opr1 = operand_left;
+            node->binary_opr2 = operand_right;
+            operand_left = node;
+        }
+        else if(token_is(state, TOKEN_MUL_ASS)) {
+            
+            t_token op_token = state->last_token;
+            lex_next_token(state);
+            t_ast_node *operand_right = parse_expr7(state);
+            t_ast_node *node = alloc_ast_node();
+            node->type = AST_binary_expr_node;
+            node->binary_op = BINARY_sub_ass;
+            node->binary_opr1 = operand_left;
+            node->binary_opr2 = operand_right;
+            operand_left = node;
+        }
+        else if(token_is(state, TOKEN_DIV_ASS)) {
+            
+            t_token op_token = state->last_token;
+            lex_next_token(state);
+            t_ast_node *operand_right = parse_expr7(state);
+            t_ast_node *node = alloc_ast_node();
+            node->type = AST_binary_expr_node;
+            node->binary_op = BINARY_div_ass;
+            node->binary_opr1 = operand_left;
+            node->binary_opr2 = operand_right;
+            operand_left = node;
+        }
+        else if(token_is(state, '=')) {
+            
+            t_token op_token = state->last_token;
+            lex_next_token(state);
+            t_ast_node *operand_right = parse_expr7(state);
+            t_ast_node *node = alloc_ast_node();
+            node->type = AST_binary_expr_node;
+            node->binary_op = '-';
+            node->binary_opr1 = operand_left;
+            node->binary_opr2 = operand_right;
+            operand_left = node;
         }
     }
-    return lhs;
+    //token_expect(state, ';');
+    return operand_left;
 }
+
 
 static t_ast_node *parse_stmts(t_lexstate *state);
 static t_ast_node *parse_stmt(t_lexstate *state);
@@ -893,6 +944,10 @@ static char const *get_binary_op_string(t_binary_op_cat cat) {
         case '-': return "-";
         case '*': return "*";
         case '/': return "/";
+        case BINARY_add_ass: return "+=";
+        case BINARY_sub_ass: return "-=";
+        case BINARY_div_ass: return "*=";
+        case BINARY_mul_ass: return "/=";
         case BINARY_and: return "and";
         case BINARY_or: return "or";
         case '<': return "<";

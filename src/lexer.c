@@ -12,6 +12,12 @@ enum {
     TOKEN_CMP_EQ,
     TOKEN_CMP_LEQ,
     TOKEN_CMP_GEQ,
+    
+    TOKEN_ADD_ASS,
+    TOKEN_SUB_ASS,
+    TOKEN_MUL_ASS,
+    TOKEN_DIV_ASS,
+    
     TOKEN_LEFT_ARROW,
 } typedef t_token_kind;
 
@@ -244,6 +250,30 @@ static void lex_next_token(t_lexstate *state) {
             }
             if(lex_match_char(state, '-')) {
                 state->last_token.kind = TOKEN_LEFT_ARROW;
+            }
+        }
+        else if(lex_match_char(state, '+')) {
+            state->last_token.kind = '+';
+            if(lex_match_char(state, '=')) {
+                state->last_token.kind = TOKEN_ADD_ASS;
+            }
+        }
+        else if(lex_match_char(state, '-')) {
+            state->last_token.kind = '-';
+            if(lex_match_char(state, '=')) {
+                state->last_token.kind = TOKEN_SUB_ASS;
+            }
+        }
+        else if(lex_match_char(state, '*')) {
+            state->last_token.kind = '*';
+            if(lex_match_char(state, '=')) {
+                state->last_token.kind = TOKEN_MUL_ASS;
+            }
+        }
+        else if(lex_match_char(state, '/')) {
+            state->last_token.kind = '/';
+            if(lex_match_char(state, '=')) {
+                state->last_token.kind = TOKEN_DIV_ASS;
             }
         }
         else if(*state->stream == 0) {
