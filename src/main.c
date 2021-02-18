@@ -45,11 +45,9 @@ int main(void) {
     t_ast_node *code = parse_stmts(&state);
     check_errors();
     
-    if(now_errors != 0) {
-        printf("\n");
-        ast_node_print_lisp(code, 0);
-        printf("\n");
-    }
+    printf("\n");
+    ast_node_print_lisp(code, 0);
+    printf("\n");
     
     return 0;
 }

@@ -166,7 +166,7 @@ static inline bool token_match(t_lexstate *state, t_token_kind kind) {
     return false;
 }
 
-static inline void print_parse_error(t_lexstate *state, char const *string) {
+static inline void parse_error(t_lexstate *state, char const *string) {
     push_errorf("%s(%d, %d): %s",
                 state->filename,
                 state->line, state->offset,
@@ -409,7 +409,7 @@ static t_ast_node *parse_assignment(t_lexstate *state) {
             lhs = node;
         }
         else {
-            print_parse_error(state, "expected assignment");
+            parse_error(state, "expected assignment");
         }
     }
     return lhs;
@@ -473,84 +473,64 @@ static t_ast_node *parse_type(t_lexstate *state) {
     node->type = AST_type_node;
     node->type_cat = TYPE_none;
     
+    t_token primitive = state->last_token;
+    if(token_expect(state, TOKEN_IDN)) {
+        node->type_cat = TYPE_primitive;
+        node->type_primitive = primitive;
+    }
+    else return null;
+    
     while(true) {
-        if(token_is_identifier(state, keyword_int)) {
-            node->type_primitive = state->last_token;
-            if(node->type_cat == TYPE_none) {
-                node->type_cat = TYPE_primitive;
-                lex_next_token(state);
+        if(node->type_cat != TYPE_none) {
+            if(token_match(state, '$')) {
+                t_ast_node *pnode = alloc_ast_node();
+                pnode->type = AST_type_node;
+                pnode->type_cat = TYPE_pointer;
+                pnode->base_type = node;
+                node = pnode;
             }
-            else break;
-        }
-        else if(token_is_identifier(state, keyword_bool)) {
-            node->type_primitive = state->last_token;
-            if(node->type_cat == TYPE_none) {
-                node->type_cat = TYPE_primitive;
-                lex_next_token(state);
-            }
-            else break;
-        }
-        else if(token_is_identifier(state, keyword_byte)) {
-            node->type_primitive = state->last_token;
-            if(node->type_cat == TYPE_none) {
-                node->type_cat = TYPE_primitive;
-                lex_next_token(state);
-            }
-            else break;
-        }
-        else if(token_is_identifier(state, keyword_float)) {
-            node->type_primitive = state->last_token;
-            if(node->type_cat == TYPE_none) {
-                node->type_cat = TYPE_primitive;
-                lex_next_token(state);
-            }
-            else break;
-        }
-        else if(token_match(state, '$')) {
-            t_ast_node *pnode = alloc_ast_node();
-            pnode->type = AST_type_node;
-            pnode->type_cat = TYPE_pointer;
-            pnode->base_type = node;
-            node = pnode;
-        }
-        else if(token_match(state, '[')) {
-            if(!token_expect(state, ']')) {
-                return null;
-            }
-            t_ast_node *pnode = alloc_ast_node();
-            pnode->type = AST_type_node;
-            pnode->type_cat = TYPE_slice;
-            pnode->base_type = node;
-            node = pnode;
-        }
-        else if(token_match(state, TOKEN_LEFT_ARROW)) {
-            if(!token_expect(state, '(')) {
-                return null;
-            }
-            t_ast_node *decl_list = alloc_ast_node();
-            t_ast_node *function_node = alloc_ast_node();
-            function_node->type = AST_type_node;
-            function_node->type_cat = TYPE_function;
-            function_node->function_parameters = decl_list;
-            function_node->function_return_type = node;
-            node = function_node;
-            while(true) {
-                t_type_node *parameter = parse_type(state);
-                node_attach_next(decl_list, parameter);
-                token_match(state, TOKEN_IDN);
-                if(token_is(state, ')')) {
-                    break;
+            else if(token_match(state, '[')) {
+                if(!token_expect(state, ']')) {
+                    return null;
                 }
-                if(parameter == null) return null;
-                else if(!token_expect(state, ',')) { // should be ';' ?
+                t_ast_node *pnode = alloc_ast_node();
+                pnode->type = AST_type_node;
+                pnode->type_cat = TYPE_slice;
+                pnode->base_type = node;
+                node = pnode;
+            }
+            else if(token_match(state, TOKEN_LEFT_ARROW)) {
+                if(!token_expect(state, '(')) {
+                    return null;
+                }
+                t_ast_node *decl_list = alloc_ast_node();
+                t_ast_node *function_node = alloc_ast_node();
+                function_node->type = AST_type_node;
+                function_node->type_cat = TYPE_function;
+                function_node->function_parameters = decl_list;
+                function_node->function_return_type = node;
+                node = function_node;
+                while(true) {
+                    printf("a\n");
+                    if(token_is(state, ')')) {
+                        break;
+                    }
+                    t_type_node *parameter = parse_type(state);
+                    if(parameter == null) {
+                        parse_error(state, "no type in function declarator");
+                    }
+                    node_attach_next(decl_list, parameter);
+                    token_match(state, TOKEN_IDN);
+                    if(!token_match(state, ';')) {
+                        break;
+                    }
+                }
+                if(!token_expect(state, ')')) {
                     return null;
                 }
             }
-            if(!token_expect(state, ')')) {
-                return null;
-            }
+            else break;
         }
-        else break;
     }
     return node;
 }
@@ -711,7 +691,7 @@ static t_token ast_expr_node_evaluate(t_ast_node *ast_node) {
 
 static void print_level(int level) {
     for(int i = 0; i < level; i += 1) {
-        printf(" ");
+        printf("  ");
     }
 }
 
@@ -801,7 +781,10 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
     }
     else if(ast_node->type == AST_decl_node) {
         printf("(decl");
-        printf(" %s ", ast_node->decl_name->str);
+        if(null != ast_node->decl_name) {
+            printf(" %s ", ast_node->decl_name->str);
+        }
+        else printf(" NONAME ");
         ast_node_print_lisp(ast_node->decl_type, level+1);
         if(null != ast_node->decl_value) {
             printf(" ");
@@ -836,7 +819,7 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
                     ast_node_print_lisp(param, level+1);
                 }
                 printf("\n");
-                print_level(level);
+                print_level(level-1);
                 printf(")");
             } break;
             default: {
