@@ -554,14 +554,18 @@ static t_ast_node *parse_declaration(t_lexstate *state) {
     if(token_expect(state, TOKEN_IDN)) {
         node->decl_name = name.str_value;
     }
+    
     if(token_match(state, '=')) {
         node->decl_value = parse_expr(state);
+        token_expect(state, ';');
     }
-    if(token_is(state, '{')) {
+    else if(token_is(state, '{')) {
         node->decl_value = parse_stmts(state);
     }
     else {
-        token_expect(state, ';');
+        if(!token_expect(state, ';')) {
+            return null;
+        }
     }
     return node;
 }
@@ -639,6 +643,10 @@ static t_ast_node *parse_global_scope(t_lexstate *state) {
         }
         else {
             t_ast_node *node = parse_declaration(state);
+            if(node == null) {
+                parse_error(state, "unable to parse declaration");
+                return block;
+            }
             node_attach_next(block, node);
         }
     }

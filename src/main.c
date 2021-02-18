@@ -19,6 +19,7 @@
 
 int main(void) {
     init_errors(20);
+    string_builder_init();
     
     test_lexing();
     test_interns();

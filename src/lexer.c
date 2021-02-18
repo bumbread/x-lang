@@ -5,6 +5,8 @@ enum {
     // 0..127
     
     TOKEN_INT = 128, // integer numbers
+    TOKEN_FLT,
+    TOKEN_STR,
     TOKEN_IDN,
     TOKEN_CMP_NEQ,
     TOKEN_CMP_EQ,
@@ -198,8 +200,6 @@ static void lex_next_token(t_lexstate *state) {
         }
     }
     else if(lex_match_char(state, '"')) { // string literal
-        push_errorf("unexpected symbol '\"'");
-#if 0    
         string_builder_start();
         while(true) {
             //char c = state_next_char(state);
@@ -215,7 +215,6 @@ static void lex_next_token(t_lexstate *state) {
         t_intern const *intern = intern_string(result, result + string_builder.len);
         state->last_token.str_value = intern;
         state->last_token.kind = TOKEN_STR;
-#endif
     }
     else { // parse operators.
         
