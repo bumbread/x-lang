@@ -2,6 +2,7 @@
 enum {
     AST_value_node,
     AST_type_node,
+    AST_ternary_expr_node,
     AST_binary_expr_node,
     AST_unary_expr_node,
     AST_decl_node,
@@ -45,7 +46,14 @@ struct t_ast_node_ {
         struct {
             t_token value_token;
         };
-        //AST_value_node (TODO)
+        // TODO(bumbread): replace t_token with `int`?
+        //AST_ternary_expr_node
+        struct {
+            t_value_node *ternary_opr1;
+            t_value_node *ternary_opr2;
+            t_value_node *ternary_opr3;
+            t_token ternary_op;
+        };
         //AST_binary_expr_node
         struct {
             t_value_node *binary_opr1;
@@ -78,7 +86,6 @@ struct t_ast_node_ {
             t_intern const *decl_name;
             t_value_node *decl_value;
         };
-        
         // AST_stmt_node,
         struct {
             t_ast_stmt_category stmt_cat;
@@ -268,13 +275,24 @@ static t_ast_node *parse_expr2(t_lexstate *state) {
         while(true) {
             op_token = state->last_token;
             if(token_match(state, '[')) {
+                t_ast_node *first_index = parse_expr(state);
                 t_ast_node *node = alloc_ast_node();
-                node->type = AST_binary_expr_node;
-                node->binary_opr1 = result;
-                node->binary_opr2 = parse_expr(state);
-                node->binary_op = op_token;
-                token_expect(state, ']');
-                
+                if(token_match(state, ':')) {
+                    t_ast_node *second_index = parse_expr(state);
+                    node->type = AST_ternary_expr_node; //slicing operator
+                    node->ternary_opr1 = result;
+                    node->ternary_opr2 = first_index;
+                    node->ternary_opr3 = second_index;
+                    node->ternary_op = op_token;
+                    token_expect(state, ']');
+                }
+                else {
+                    node->type = AST_binary_expr_node; // array access operator
+                    node->binary_opr1 = result;
+                    node->binary_opr2 = first_index;
+                    node->binary_op = op_token;
+                    token_expect(state, ']');
+                }
                 result = node;
             }
             else break;
@@ -510,7 +528,6 @@ static t_ast_node *parse_type(t_lexstate *state) {
                 function_node->function_return_type = node;
                 node = function_node;
                 while(true) {
-                    printf("a\n");
                     if(token_is(state, ')')) {
                         break;
                     }
@@ -749,13 +766,26 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
         ast_node_print_lisp(ast_node->unary_opr1, 0);
         printf(")");
     }
-    if(ast_node->type == AST_binary_expr_node) {
+    else if(ast_node->type == AST_binary_expr_node) {
         printf("(");
-        printf("%s", get_token_string(&ast_node->binary_op));
-        printf(" ");
+        if(ast_node->binary_op.kind == '[') {
+            printf("array ");
+        }
+        else {
+            printf("%s ", get_token_string(&ast_node->binary_op));
+        }
         ast_node_print_lisp(ast_node->binary_opr1, 0);
         printf(" ");
         ast_node_print_lisp(ast_node->binary_opr2, 0);
+        printf(")");
+    }
+    else if(ast_node->type == AST_ternary_expr_node) {
+        printf("(slice ");
+        ast_node_print_lisp(ast_node->ternary_opr1, 0);
+        printf(" ");
+        ast_node_print_lisp(ast_node->ternary_opr2, 0);
+        printf(" ");
+        ast_node_print_lisp(ast_node->ternary_opr3, 0);
         printf(")");
     }
     else if(ast_node->type == AST_stmt_node) {
