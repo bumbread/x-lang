@@ -28,6 +28,7 @@ struct {
     char const *end;
     union {
         i64 int_value;
+        f64 flt_value;
         t_intern const *str_value;
     };
     u64 line;

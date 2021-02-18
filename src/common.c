@@ -52,3 +52,9 @@ void check_errors(void) {
         printf("%s\n", errors[error_index]);
     }
 }
+
+static void print_level(int level) {
+    for(int i = 0; i < level; i += 1) {
+        printf("  ");
+    }
+}
