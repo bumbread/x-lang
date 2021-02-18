@@ -94,8 +94,7 @@ struct t_ast_node_ {
                     t_value_node *while_condition;
                     t_stmt_node *while_block;
                 };
-                // print
-                t_value_node *print_value;
+                t_value_node *stmt_value;
             };
         };
     };
@@ -515,12 +514,21 @@ static t_ast_node *parse_type(t_lexstate *state) {
                     if(token_is(state, ')')) {
                         break;
                     }
-                    t_type_node *parameter = parse_type(state);
-                    if(parameter == null) {
+                    t_type_node *parameter_type = parse_type(state);
+                    if(parameter_type == null) {
                         parse_error(state, "no type in function declarator");
                     }
-                    node_attach_next(decl_list, parameter);
-                    token_match(state, TOKEN_IDN);
+                    t_intern const *opt_param_name = null;
+                    t_token parameter_name = state->last_token;
+                    if(token_match(state, TOKEN_IDN)) {
+                        opt_param_name = parameter_name.str_value;
+                    }
+                    t_ast_node *func_param_decl_node = alloc_ast_node();
+                    func_param_decl_node->type = AST_decl_node;
+                    func_param_decl_node->decl_type = parameter_type;
+                    func_param_decl_node->decl_name = opt_param_name;
+                    func_param_decl_node->decl_value = null;
+                    node_attach_next(decl_list, func_param_decl_node);
                     if(!token_match(state, ';')) {
                         break;
                     }
@@ -545,13 +553,16 @@ static t_ast_node *parse_declaration(t_lexstate *state) {
     t_token name = state->last_token;
     if(token_expect(state, TOKEN_IDN)) {
         node->decl_name = name.str_value;
-        if(token_match(state, '=')) {
-            t_ast_node *value = parse_expr(state);
-            node->decl_value = value;
-        }
     }
-    
-    token_expect(state, ';');
+    if(token_match(state, '=')) {
+        node->decl_value = parse_expr(state);
+    }
+    if(token_is(state, '{')) {
+        node->decl_value = parse_stmts(state);
+    }
+    else {
+        token_expect(state, ';');
+    }
     return node;
 }
 
@@ -570,6 +581,7 @@ static t_ast_node *parse_stmt(t_lexstate *state) {
         node = alloc_ast_node();
         node->type = AST_stmt_node;
         node->stmt_cat = STMT_return;
+        node->stmt_value = parse_expr(state);
         token_expect(state, ';');
     }
     else if(token_match_identifier(state, keyword_break)) {
@@ -588,7 +600,7 @@ static t_ast_node *parse_stmt(t_lexstate *state) {
         node = alloc_ast_node();
         node->type = AST_stmt_node;
         node->stmt_cat = STMT_print;
-        node->print_value = parse_expr(state);
+        node->stmt_value = parse_expr(state);
         token_expect(state, ';');
     }
     else if(token_is(state, '{')) {
@@ -612,6 +624,21 @@ static t_ast_node *parse_stmts(t_lexstate *state) {
         }
         else {
             t_ast_node *node = parse_stmt(state);
+            node_attach_next(block, node);
+        }
+    }
+    return block;
+}
+
+static t_ast_node *parse_global_scope(t_lexstate *state) {
+    t_ast_node *block = alloc_ast_node();
+    block->type = AST_stmt_block;
+    while(true) {
+        if(token_match(state, TOKEN_EOF)) {
+            break;
+        }
+        else {
+            t_ast_node *node = parse_declaration(state);
             node_attach_next(block, node);
         }
     }
@@ -748,7 +775,15 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
                 printf("break");
             } break;
             case STMT_return: {
-                printf("return");
+                printf("(return ");
+                if(ast_node->stmt_value != null) {
+                    printf("\n");
+                    print_level(level+1);
+                    ast_node_print_lisp(ast_node->stmt_value, level+1);
+                    printf("\n");
+                    print_level(level);
+                }
+                printf(")");
             } break;
             case STMT_continue: {
                 printf("continue");
@@ -757,7 +792,7 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
                 printf("(print ");
                 printf("\n");
                 print_level(level+1);
-                ast_node_print_lisp(ast_node->print_value, level+1);
+                ast_node_print_lisp(ast_node->stmt_value, level+1);
                 printf("\n");
                 print_level(level);
                 printf(")");
@@ -814,12 +849,12 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
                     param != null;
                     param = param->next) {
                     printf("\n");
-                    print_level(level);
+                    print_level(level+1);
                     printf("param: ");
                     ast_node_print_lisp(param, level+1);
                 }
                 printf("\n");
-                print_level(level-1);
+                print_level(level);
                 printf(")");
             } break;
             default: {

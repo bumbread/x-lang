@@ -310,3 +310,7 @@ static char const *get_token_string(t_token *token) {
     return get_token_kind_name(kind);
 }
 
+static void print_token(t_token *token) {
+    printf("%s", get_token_string(token));
+}
+

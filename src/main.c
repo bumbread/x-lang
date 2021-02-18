@@ -42,7 +42,7 @@ int main(void) {
     t_lexstate state;
     lex_init(&state, filename, (char *)buf);
     lex_next_token(&state);
-    t_ast_node *code = parse_stmts(&state);
+    t_ast_node *code = parse_global_scope(&state);
     check_errors();
     
     printf("\n");
