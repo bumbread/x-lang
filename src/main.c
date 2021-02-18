@@ -17,6 +17,8 @@
 #include"checker.c"
 #include"test.c"
 
+#include"c_output/generator.c"
+
 int main(void) {
     init_errors(20);
     string_builder_init();
@@ -46,9 +48,14 @@ int main(void) {
     t_ast_node *code = parse_global_scope(&state);
     check_errors();
     
+    char const *output_filename = "test.c";
+    FILE *output = fopen(output_filename, "w");
+    generate_output(output, code);
+#if 0
     printf("\n");
     ast_node_print_lisp(code, 0);
     printf("\n");
+#endif
     
     return 0;
 }

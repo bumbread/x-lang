@@ -132,6 +132,8 @@ struct t_ast_node_ {
     t_ast_node *last;
 };
 
+static t_ast_node *all_procs;
+
 static t_intern const *keyword_if;
 static t_intern const *keyword_else;
 static t_intern const *keyword_while;
@@ -179,6 +181,7 @@ static void parser_init_memory(ptr buffer_size, void *buffer) {
     keyword_float    = intern_cstring("float");
     keyword_string   = intern_cstring("string");
     
+    all_procs = alloc_ast_node();
 }
 
 static inline bool token_is(t_lexstate *state, t_token_kind kind) {
@@ -771,6 +774,11 @@ static t_ast_node *parse_declaration(t_lexstate *state) {
             return null;
         }
     }
+    
+    assert(node->decl_type != null);
+    if(node->decl_type->type_cat == TYPE_function) {
+        node_attach_next(all_procs, node);
+    }
     return node;
 }
 
@@ -969,10 +977,7 @@ static char const *get_ternary_op_string(t_ternary_op_cat cat) {
 }
 
 static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
-    if(ast_node == null) {
-        printf("ERROR: printing null node.\n");
-        return;
-    }
+    assert(ast_node != null);
     if(ast_node->type == AST_value_node) {
         if(ast_node->value_token.kind == TOKEN_INT) {
             printf("%llu", ast_node->value_token.int_value);
