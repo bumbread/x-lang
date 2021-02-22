@@ -51,14 +51,16 @@ int main(void) {
     check_errors();
 #endif
     
-    t_ast_node *code = parse_ast_node_expr_level("2+2*2");
+    t_ast_node *code = parse_ast_node_expr_level("2 + + 2*2");
     ast_node_print_lisp(code, 0);
     printf("\n");
     
+    
+#if 0
     char const *output_filename = "test.c";
     FILE *output = fopen(output_filename, "w");
     print_output(stdout, code);
-#if 0
+#else
     printf("\n");
     ast_node_print_lisp(code, 0);
     printf("\n");

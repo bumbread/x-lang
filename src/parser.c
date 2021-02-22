@@ -51,16 +51,6 @@ enum {
 
 //struct t_ast_node_;
 typedef struct t_ast_node_ t_ast_node;
-typedef struct t_ast_node_ t_type_node;
-typedef struct t_ast_node_ t_value_node;
-typedef struct t_ast_node_ t_expr_node;
-typedef struct t_ast_node_ t_binary_expr_node;
-typedef struct t_ast_node_ t_unary_expr_node;
-typedef struct t_ast_node_ t_decl_node;
-typedef struct t_ast_node_ t_decl_list_node;
-typedef struct t_ast_node_ t_stmt_node;
-typedef struct t_ast_node_ t_stmt_block_node;
-
 struct t_ast_node_ {
     t_ast_node_type type;
     union {
@@ -70,20 +60,20 @@ struct t_ast_node_ {
         };
         //AST_ternary_expr_node
         struct {
-            t_expr_node *ternary_opr1;
-            t_expr_node *ternary_opr2;
-            t_expr_node *ternary_opr3;
+            t_ast_node *ternary_opr1;
+            t_ast_node *ternary_opr2;
+            t_ast_node *ternary_opr3;
             t_ternary_op_cat ternary_op;
         };
         //AST_binary_expr_node
         struct {
-            t_expr_node *binary_opr1;
-            t_expr_node *binary_opr2;
+            t_ast_node *binary_opr1;
+            t_ast_node *binary_opr2;
             t_binary_op_cat binary_op;
         };
         //AST_unary_expr_node
         struct {
-            t_expr_node *unary_opr1;
+            t_ast_node *unary_opr1;
             t_unary_op_cat unary_op;
         };
         //AST_type_node
@@ -93,19 +83,19 @@ struct t_ast_node_ {
                 // primitive
                 t_intern const *primitive_typename;
                 // pointer, slice
-                t_type_node *base_type;
+                t_ast_node *base_type;
                 // functions
                 struct {
-                    t_decl_list_node *function_parameters;
-                    t_type_node *function_return_type;
+                    t_ast_node *function_parameters;
+                    t_ast_node *function_return_type;
                 };
             };
         };
         // AST_decl_node
         struct {
-            t_type_node *decl_type;
             t_intern const *decl_name;
-            t_expr_node *decl_value;
+            t_ast_node *decl_type;
+            t_ast_node *decl_value;
         };
         // AST_stmt_node,
         struct {
@@ -113,20 +103,20 @@ struct t_ast_node_ {
             union {
                 // if
                 struct {
-                    t_expr_node *if_condition;
-                    t_stmt_block_node *if_true_block;
-                    t_stmt_block_node *if_false_block;
+                    t_ast_node *if_condition;
+                    t_ast_node *if_true_block;
+                    t_ast_node *if_false_block;
                 };
                 // while
                 struct {
-                    t_expr_node *while_condition;
-                    t_stmt_node *while_block;
+                    t_ast_node *while_condition;
+                    t_ast_node *while_block;
                 };
-                t_expr_node *stmt_value;
+                t_ast_node *stmt_value;
             };
         };
     };
-    t_type_node *value_type;
+    t_ast_node *value_type;
     t_ast_node *scope;
     t_ast_node *first;
     t_ast_node *prev;
@@ -724,7 +714,7 @@ static t_ast_node *parse_type(t_lexstate *state) {
                     if(token_is(state, ')')) {
                         break;
                     }
-                    t_type_node *parameter_type = parse_type(state);
+                    t_ast_node *parameter_type = parse_type(state);
                     if(parameter_type == null) {
                         parse_error(state, "no type in function declarator");
                     }

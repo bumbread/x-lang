@@ -1,9 +1,9 @@
 
-static t_type_node *type_int;
-static t_type_node *type_byte;
-static t_type_node *type_bool;
-static t_type_node *type_float;
-static t_type_node *type_string;
+static t_ast_node *type_int;
+static t_ast_node *type_byte;
+static t_ast_node *type_bool;
+static t_ast_node *type_float;
+static t_ast_node *type_string;
 
 static void checker_init_types(void) {
     type_int = alloc_ast_node();
@@ -27,7 +27,7 @@ static void checker_init_types(void) {
     type_float->primitive_typename = keyword_float;
 }
 
-static t_type_node *get_decl_from_name(t_ast_node *scope, t_intern const *type) {
+static t_ast_node *get_decl_from_name(t_ast_node *scope, t_intern const *type) {
     return null;
 }
 
