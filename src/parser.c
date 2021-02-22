@@ -18,7 +18,7 @@ enum {
     TYPE_pointer,
     TYPE_slice,
     TYPE_function,
-} typedef t_ast_type_category;
+} typedef t_type_category;
 
 enum {
     STMT_if,
@@ -49,10 +49,11 @@ enum {
     TERNARY_slice = 128,
 } typedef t_ternary_op_cat;
 
-struct t_ast_node_;
+//struct t_ast_node_;
 typedef struct t_ast_node_ t_ast_node;
 typedef struct t_ast_node_ t_type_node;
 typedef struct t_ast_node_ t_value_node;
+typedef struct t_ast_node_ t_expr_node;
 typedef struct t_ast_node_ t_binary_expr_node;
 typedef struct t_ast_node_ t_unary_expr_node;
 typedef struct t_ast_node_ t_decl_node;
@@ -67,31 +68,30 @@ struct t_ast_node_ {
         struct {
             t_token value_token;
         };
-        // TODO(bumbread): replace t_token with `int`?
         //AST_ternary_expr_node
         struct {
-            t_value_node *ternary_opr1;
-            t_value_node *ternary_opr2;
-            t_value_node *ternary_opr3;
+            t_expr_node *ternary_opr1;
+            t_expr_node *ternary_opr2;
+            t_expr_node *ternary_opr3;
             t_ternary_op_cat ternary_op;
         };
         //AST_binary_expr_node
         struct {
-            t_value_node *binary_opr1;
-            t_value_node *binary_opr2;
+            t_expr_node *binary_opr1;
+            t_expr_node *binary_opr2;
             t_binary_op_cat binary_op;
         };
         //AST_unary_expr_node
         struct {
-            t_value_node *unary_opr1;
+            t_expr_node *unary_opr1;
             t_unary_op_cat unary_op;
         };
         //AST_type_node
         struct {
-            t_ast_type_category type_cat;
+            t_type_category type_cat;
             union {
                 // primitive
-                t_token type_primitive;
+                t_intern const *primitive_typename;
                 // pointer, slice
                 t_type_node *base_type;
                 // functions
@@ -105,7 +105,7 @@ struct t_ast_node_ {
         struct {
             t_type_node *decl_type;
             t_intern const *decl_name;
-            t_value_node *decl_value;
+            t_expr_node *decl_value;
         };
         // AST_stmt_node,
         struct {
@@ -113,19 +113,21 @@ struct t_ast_node_ {
             union {
                 // if
                 struct {
-                    t_value_node *if_condition;
+                    t_expr_node *if_condition;
                     t_stmt_block_node *if_true_block;
                     t_stmt_block_node *if_false_block;
                 };
                 // while
                 struct {
-                    t_value_node *while_condition;
+                    t_expr_node *while_condition;
                     t_stmt_node *while_block;
                 };
-                t_value_node *stmt_value;
+                t_expr_node *stmt_value;
             };
         };
     };
+    t_type_node *value_type;
+    t_ast_node *scope;
     t_ast_node *first;
     t_ast_node *prev;
     t_ast_node *next;
@@ -158,10 +160,12 @@ static t_ast_node *alloc_ast_node(void) {
     result->last = null;
     result->next = null;
     result->prev = null;
+    result->scope = null;
+    result->value_type = null;
     return result;
 }
 
-static void parser_init_memory(ptr buffer_size, void *buffer) {
+static void parser_init_memory(void) {
     keyword_if       = intern_cstring("if");
     keyword_else     = intern_cstring("else");
     keyword_while    = intern_cstring("while");
@@ -173,7 +177,6 @@ static void parser_init_memory(ptr buffer_size, void *buffer) {
     
     keyword_and      = intern_cstring("and");
     keyword_or       = intern_cstring("or");
-    
     
     keyword_bool     = intern_cstring("bool");
     keyword_byte     = intern_cstring("byte");
@@ -683,7 +686,7 @@ static t_ast_node *parse_type(t_lexstate *state) {
     t_token primitive = state->last_token;
     if(token_expect(state, TOKEN_IDN)) {
         node->type_cat = TYPE_primitive;
-        node->type_primitive = primitive;
+        node->primitive_typename = primitive.str_value;
     }
     else return null;
     
@@ -1108,7 +1111,7 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
     else if(ast_node->type == AST_type_node) {
         switch(ast_node->type_cat) {
             case TYPE_primitive: {
-                printf("%s", get_token_string(&ast_node->type_primitive));
+                printf("%s", ast_node->primitive_typename->str);
             } break;
             case TYPE_pointer: {
                 printf("(pointer to ");
@@ -1140,4 +1143,31 @@ static void ast_node_print_lisp(t_ast_node *ast_node, int level) {
             }
         }
     }
+}
+
+static t_ast_node *parse_ast_node_expr_level(char const *expr) {
+    t_lexstate state;
+    lex_init(&state, "@test", expr);
+    lex_next_token(&state);
+    t_ast_node *code = parse_expr(&state);
+    check_errors();
+    return code;
+}
+
+static t_ast_node *parse_ast_node_stmt_level(char const *stmt) {
+    t_lexstate state;
+    lex_init(&state, "@test", stmt);
+    lex_next_token(&state);
+    t_ast_node *code = parse_stmt(&state);
+    check_errors();
+    return code;
+}
+
+static t_ast_node *parse_ast_node_global_level(char const *code_str) {
+    t_lexstate state;
+    lex_init(&state, "@test", code_str);
+    lex_next_token(&state);
+    t_ast_node *code = parse_global_scope(&state);
+    check_errors();
+    return code;
 }

@@ -27,8 +27,10 @@ int main(void) {
     test_interns();
     
     init_interns(malloc);
-    parser_init_memory(10*mb, malloc(10*mb));
+    parser_init_memory();
+    checker_init_types();
     
+#if 0    
     byte *buf;
     char const *filename = "test.x";
     FILE *input = fopen(filename, "rb");
@@ -47,10 +49,15 @@ int main(void) {
     lex_next_token(&state);
     t_ast_node *code = parse_global_scope(&state);
     check_errors();
+#endif
+    
+    t_ast_node *code = parse_ast_node_expr_level("2+2*2");
+    ast_node_print_lisp(code, 0);
+    printf("\n");
     
     char const *output_filename = "test.c";
     FILE *output = fopen(output_filename, "w");
-    generate_output(output, code);
+    print_output(stdout, code);
 #if 0
     printf("\n");
     ast_node_print_lisp(code, 0);
