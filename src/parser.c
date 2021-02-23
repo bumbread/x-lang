@@ -318,7 +318,7 @@ static t_ast_node *parse_expr_list(t_lexstate *state,
     t_ast_node *node = alloc_node();
     node->cat = AST_list_node;
     if(token_is_kind(state, seq_terminator)) {
-        return null;
+        return node;
     }
     while(true) {
         t_ast_node *value = parse_expr(state);
