@@ -7,34 +7,34 @@ This is x-lang (X language, x, x-language, whatever). The language created by me
 DECLARATIONS
 
 Declaration syntax is different from most other languages.
-:int x; // declares x as int
+  :int x; // declares x as int
 
-The colon is 'declaration operator', so to say.
+The colon is 'declaration operator', so to say. It is only used in statements context. In struct decls (TODO), function argument decls &c., the colon isn't used.
 
 Other types:
-:int$ x;             // pointer to int
-:int[] x;            // slice of int
-:int<-(bool, int) x; // function returning int, taking bool and int
+  :int$ x;             // pointer to int
+  :int[] x;            // slice of int
+  :int<-(bool, int) x; // function returning int, taking bool and int
 
 The types cascade from left to right, from the inner-most to the outer most.
-:int$[] x;          // slice of pointer to int
-:int[]$ x;          // pointer of slice of int
-:int$<-(bool)[]     // slice of function returning pointer to int
+  :int$[] x;           // slice of pointer to int
+  :int[]$ x;           // pointer of slice of int
+  :int$<-(bool)[]      // slice of function returning pointer to int
 
 A value can be optionally assigned upon declaration.
-:bool error = false;
+  :bool error = false;
 
 OPERATIONS
 The main operations in the language:
-- + * /            // binary/unary arithmetic
-< > <= >= == !=    // relational operators
-and or             // binary logical operators (add more?)
-$                  // address of operator (unary, to the left)
-@                  // dereference operator
-[index]            // indexing operator
-[low:high]         // slicing operator
-+= -= *= /= =      // assignment
-print              // prints any value (to be removed?)
+  - + * /              // binary/unary arithmetic
+  < > <= >= == !=      // relational operators
+  and or               // binary logical operators (add more?)
+  $variable            // address of operator (unary, to the left)
+  @pointer             // dereference operator
+  slice[index]         // indexing operator
+  slice[low:high]      // (sub-)slicing operator
+  += -= *= /= =        // assignment
+  print                // prints any value (to be removed?)
 
 Operator precedence table (high to low):
 1. Indexing, slicing operators
@@ -45,18 +45,28 @@ Operator precedence table (high to low):
 6. Binary logical operators
 
 Then the expression:
-2 > 3 and 2+4*$x[3] == @array_ptr[index]
+  2 > 3 and 2+4*$x[3] == @array_ptr[index]
 
 Will be parsed as:
-(2 > 3) and ((2 + (4 * (($x)[3])) == ((@array_ptr)[index]))
+  (2 > 3) and ((2 + (4 * (($x)[3])) == ((@array_ptr)[index]))
 
 STATEMENTS
 There's some sexy sugar for if and while statements. You don't have to parenthesize the condition.
 
-if <condition> {}
-while <condition> {}
+(The angle braces aren't part of the syntax)
+
+  if <condition> {}
+  while <condition> {}
 
 Although you _have_ to encapsulate the operators of the block inside curly braces. The braces in the final else statement are not required.
+
+  if 2 < 3 {
+    // ...
+  }
+  else if breadWroteHisLanguage() {
+    // ...
+  }
+  else return false;
 
 While loops support flow control operators such as break and continue.
 
