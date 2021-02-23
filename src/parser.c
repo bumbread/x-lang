@@ -72,6 +72,7 @@ enum {
     BINARY_sub_ass,
     BINARY_mul_ass,
     BINARY_div_ass,
+    BINARY_function_call,
     BINARY_subscript,
     TERNARY_FIRST_OPERATOR, // no touching
     TERNARY_slice,
@@ -363,8 +364,10 @@ static t_ast_node *parse_expr1(t_lexstate *state) {
         t_ast_node *function_call = alloc_node();
         function_call->cat = AST_expr_node;
         function_call->expr.cat = EXPR_binary_op;
+        function_call->expr.op = BINARY_function_call;
         function_call->expr.opr1 = node;
         function_call->expr.opr2 = parameter_list;
+        node = function_call;
     }
     return node;
 }
@@ -1038,6 +1041,7 @@ static char const *get_operator_string(t_operator_cat cat) {
         case BINARY_geq: return ">=";
         case BINARY_eq: return "==";
         case BINARY_neq: return "!=";
+        case BINARY_function_call: return "call";
         case BINARY_subscript: return "subscript";
         case TERNARY_slice: return "slice";
     }
