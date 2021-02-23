@@ -17,7 +17,8 @@
 #include"checker.c"
 #include"test.c"
 
-#include"c_output/generator.c"
+//#include"output/c_output.c"
+#include"output/lisp_output.c"
 
 int main(void) {
     init_errors(20);
@@ -28,7 +29,7 @@ int main(void) {
     
     init_interns(malloc);
     parser_init_memory();
-    checker_init_types();
+    //checker_init_types();
     
 #if 0    
     byte *buf;
@@ -52,18 +53,14 @@ int main(void) {
 #endif
     
     t_ast_node *code = parse_ast_node_expr_level("2 + + 2*2");
+    printf("output tree:\n\n");
     ast_node_print_lisp(code, 0);
     printf("\n");
-    
     
 #if 0
     char const *output_filename = "test.c";
     FILE *output = fopen(output_filename, "w");
     print_output(stdout, code);
-#else
-    printf("\n");
-    ast_node_print_lisp(code, 0);
-    printf("\n");
 #endif
     
     return 0;

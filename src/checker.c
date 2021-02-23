@@ -1,36 +1,9 @@
 
-static t_ast_node *type_int;
-static t_ast_node *type_byte;
-static t_ast_node *type_bool;
-static t_ast_node *type_float;
-static t_ast_node *type_string;
-
-static void checker_init_types(void) {
-    type_int = alloc_ast_node();
-    type_int->type_cat = TYPE_primitive;
-    type_int->primitive_typename = keyword_int;
-    
-    type_byte = alloc_ast_node();
-    type_byte->type_cat = TYPE_primitive;
-    type_byte->primitive_typename = keyword_byte;
-    
-    type_bool = alloc_ast_node();
-    type_bool->type_cat = TYPE_primitive;
-    type_bool->primitive_typename = keyword_bool;
-    
-    type_string = alloc_ast_node();
-    type_string->type_cat = TYPE_primitive;
-    type_string->primitive_typename = keyword_string;
-    
-    type_float = alloc_ast_node();
-    type_float->type_cat = TYPE_primitive;
-    type_float->primitive_typename = keyword_float;
-}
-
 static t_ast_node *get_decl_from_name(t_ast_node *scope, t_intern const *type) {
     return null;
 }
 
+/*
 static void derive_types_make_symtable(t_ast_node *node) {
     assert(node != null);
     if(node->type == AST_value_node) {
@@ -138,4 +111,4 @@ static void derive_types_make_symtable(t_ast_node *node) {
             }
         }
     }
-}
+}*/

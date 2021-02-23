@@ -291,11 +291,13 @@ static void lex_next_token(t_lexstate *state) {
     state->last_token.offset = state->offset;
 }
 
+
+
 static char const *get_token_kind_name(t_token_kind kind) {
     if(kind == TOKEN_INT) {return "INT";}
     else if(kind == TOKEN_IDN) {return "NAME";}
-    //else if(kind == TOKEN_FLT) {return "FLOAT";}
-    //else if(kind == TOKEN_STR) {return "STRING";}
+    else if(kind == TOKEN_FLT) {return "FLOAT";}
+    else if(kind == TOKEN_STR) {return "STRING";}
     else if(kind == '<') {return "<";}
     else if(kind == '>') {return ">";}
     else if(kind == '=') {return "=";}
@@ -335,12 +337,61 @@ static char const *get_token_string(t_token *token) {
     if(kind == TOKEN_IDN) {
         return token->str_value->str;
     }
-    //else if(kind == TOKEN_FLT) {return "FLOAT";}
-    //else if(kind == TOKEN_STR) {return "STRING";}
     return get_token_kind_name(kind);
 }
 
 static void print_token(t_token *token) {
     printf("%s", get_token_string(token));
+}
+
+
+
+static inline bool token_is_kind(t_lexstate *state, t_token_kind kind) {
+    return state->last_token.kind == kind;
+}
+
+static inline bool token_match_kind(t_lexstate *state, t_token_kind kind) {
+    if(state->last_token.kind == kind) {
+        lex_next_token(state);
+        return true;
+    }
+    return false;
+}
+
+static inline bool token_expect_kind(t_lexstate *state, t_token_kind kind) {
+    if(state->last_token.kind == kind) {
+        lex_next_token(state);
+        return true;
+    }
+    push_errorf("%s(%d, %d): expected token %s, got %s",
+                state->filename,
+                state->line, state->offset,
+                get_token_kind_name(kind),
+                get_token_string(&state->last_token));
+    return false;
+}
+
+static inline bool token_is_identifier(t_lexstate *state, t_intern const *str) {
+    if(state->last_token.kind == TOKEN_IDN) {
+        return state->last_token.str_value == str;
+    }
+    return false;
+}
+
+static inline bool token_match_identifier(t_lexstate *state, t_intern const *str) {
+    if(state->last_token.kind == TOKEN_IDN && state->last_token.str_value == str) {
+        lex_next_token(state);
+        return true;
+    }
+    return false;
+}
+
+static inline bool token_expect_identifier(t_lexstate *state, t_intern const *str) {
+    if(state->last_token.kind == TOKEN_IDN && state->last_token.str_value == str) {
+        lex_next_token(state);
+        return true;
+    }
+    push_errorf("expected keyword %s, got %s", state->last_token.str_value->str, str->str);
+    return false;
 }
 
