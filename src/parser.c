@@ -298,7 +298,7 @@ static void load_expr_node_data(t_ast_node *node, t_token *tok) {
             node->expr.cat = EXPR_variable;
             node->expr.var_name = tok->str_value;
             node->expr.type = null; // to be derived later;
-        }
+        } break;
         default:
         assert(false);
     }
