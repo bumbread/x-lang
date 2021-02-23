@@ -280,22 +280,22 @@ static void node_list_push(t_ast_list *list, t_ast_list_link *to_attach) {
 static void load_expr_node_data(t_ast_node *node, t_token *tok) {
     node->cat = AST_expr_node;
     switch(tok->kind) {
-        case TOKEN_INT: {
+        case TOKEN_int: {
             node->expr.cat = EXPR_int_value;
             node->expr.ivalue = tok->int_value;
             node->expr.type = &type_int->type;
         } break;
-        case TOKEN_FLT: {
+        case TOKEN_flt: {
             node->expr.cat = EXPR_float_value;
             node->expr.fvalue = tok->flt_value;
             node->expr.type = &type_float->type;
         } break;
-        case TOKEN_STR: {
+        case TOKEN_str: {
             node->expr.cat = EXPR_string_value;
             node->expr.svalue = tok->str_value;
             node->expr.type = &type_string->type;
         } break;
-        case TOKEN_IDN: {
+        case TOKEN_idn: {
             node->expr.cat = EXPR_variable;
             node->expr.var_name = tok->str_value;
             node->expr.type = null; // to be derived later;
@@ -343,10 +343,10 @@ static t_ast_node *parse_expr1(t_lexstate *state) {
         node = parse_expr(state);
         token_expect_kind(state, ')');
     }
-    else if(state->last_token.kind == TOKEN_STR
-            || state->last_token.kind == TOKEN_IDN
-            || state->last_token.kind == TOKEN_INT
-            || state->last_token.kind == TOKEN_FLT) {
+    else if(state->last_token.kind == TOKEN_str
+            || state->last_token.kind == TOKEN_idn
+            || state->last_token.kind == TOKEN_int
+            || state->last_token.kind == TOKEN_flt) {
         node = alloc_node();
         load_expr_node_data(node, &state->last_token);
         lex_next_token(state);
@@ -567,7 +567,7 @@ static t_ast_node *parse_expr5(t_lexstate *state) {
             operand_left = node;
         }
         
-        else if(token_is_kind(state, TOKEN_CMP_LEQ)) {
+        else if(token_is_kind(state, TOKEN_cmp_leq)) {
             t_token op_token = state->last_token;
             lex_next_token(state);
             t_ast_node *operand_right = parse_expr4(state);
@@ -581,7 +581,7 @@ static t_ast_node *parse_expr5(t_lexstate *state) {
             operand_left = node;
         }
         
-        else if(token_is_kind(state, TOKEN_CMP_GEQ)) {
+        else if(token_is_kind(state, TOKEN_cmp_geq)) {
             t_token op_token = state->last_token;
             lex_next_token(state);
             t_ast_node *operand_right = parse_expr4(state);
@@ -595,7 +595,7 @@ static t_ast_node *parse_expr5(t_lexstate *state) {
             operand_left = node;
         }
         
-        else if(token_is_kind(state, TOKEN_CMP_EQ)) {
+        else if(token_is_kind(state, TOKEN_cmp_eq)) {
             t_token op_token = state->last_token;
             lex_next_token(state);
             t_ast_node *operand_right = parse_expr4(state);
@@ -609,7 +609,7 @@ static t_ast_node *parse_expr5(t_lexstate *state) {
             operand_left = node;
         }
         
-        else if(token_is_kind(state, TOKEN_CMP_NEQ)) {
+        else if(token_is_kind(state, TOKEN_cmp_neq)) {
             t_token op_token = state->last_token;
             lex_next_token(state);
             t_ast_node *operand_right = parse_expr4(state);
@@ -675,7 +675,7 @@ static t_ast_node *parse_expr(t_lexstate *state) {
 static t_ast_node *parse_assignment(t_lexstate *state) {
     t_ast_node *operand_left = parse_expr7(state);
     if(null != operand_left) {
-        if(token_is_kind(state, TOKEN_ADD_ASS)) {
+        if(token_is_kind(state, TOKEN_add_ass)) {
             
             t_token op_token = state->last_token;
             lex_next_token(state);
@@ -688,7 +688,7 @@ static t_ast_node *parse_assignment(t_lexstate *state) {
             node->expr.opr2 = operand_right;
             operand_left = node;
         }
-        else if(token_is_kind(state, TOKEN_SUB_ASS)) {
+        else if(token_is_kind(state, TOKEN_sub_ass)) {
             
             t_token op_token = state->last_token;
             lex_next_token(state);
@@ -701,7 +701,7 @@ static t_ast_node *parse_assignment(t_lexstate *state) {
             node->expr.opr2 = operand_right;
             operand_left = node;
         }
-        else if(token_is_kind(state, TOKEN_MUL_ASS)) {
+        else if(token_is_kind(state, TOKEN_mul_ass)) {
             
             t_token op_token = state->last_token;
             lex_next_token(state);
@@ -714,7 +714,7 @@ static t_ast_node *parse_assignment(t_lexstate *state) {
             node->expr.opr2 = operand_right;
             operand_left = node;
         }
-        else if(token_is_kind(state, TOKEN_DIV_ASS)) {
+        else if(token_is_kind(state, TOKEN_div_ass)) {
             
             t_token op_token = state->last_token;
             lex_next_token(state);
@@ -790,7 +790,7 @@ static t_ast_node *parse_type(t_lexstate *state) {
     node->cat = AST_type_node;
     
     t_token primitive = state->last_token;
-    if(token_expect_kind(state, TOKEN_IDN)) {
+    if(token_expect_kind(state, TOKEN_idn)) {
         node->type.cat = TYPE_alias;
         node->type.name = primitive.str_value;
     }
@@ -816,7 +816,7 @@ static t_ast_node *parse_type(t_lexstate *state) {
             pnode->type.base_type = node;
             node = pnode;
         }
-        else if(token_match_kind(state, TOKEN_LEFT_ARROW)) {
+        else if(token_match_kind(state, TOKEN_left_arrow)) {
             if(!token_expect_kind(state, '(')) {
                 return null;
             }
@@ -839,7 +839,7 @@ static t_ast_node *parse_type(t_lexstate *state) {
                 }
                 t_intern const *opt_param_name = null;
                 t_token parameter_name = state->last_token;
-                if(token_match_kind(state, TOKEN_IDN)) {
+                if(token_match_kind(state, TOKEN_idn)) {
                     opt_param_name = parameter_name.str_value;
                 }
                 t_ast_node *param_decl = alloc_node();
@@ -875,7 +875,7 @@ static t_ast_node *parse_declaration(t_lexstate *state) {
     node->stmt.decl_type = parse_type(state);
     
     t_token name = state->last_token;
-    if(token_expect_kind(state, TOKEN_IDN)) {
+    if(token_expect_kind(state, TOKEN_idn)) {
         node->stmt.decl_name = name.str_value;
     }
     
@@ -975,7 +975,7 @@ static t_ast_node *parse_global_scope(t_lexstate *state) {
     block->cat = AST_stmt_node;
     block->stmt.cat = STMT_block;
     while(true) {
-        if(token_match_kind(state, TOKEN_EOF)) {
+        if(token_match_kind(state, TOKEN_eof)) {
             break;
         }
         else {

@@ -1,30 +1,31 @@
 
 enum {
-    TOKEN_EOF = 0,   // end of file
+    TOKEN_eof = 0,   // end of file
     // All ascii characters are a separate token
     // 0..127
     
-    TOKEN_INT = 128, // integer numbers
-    TOKEN_FLT,
-    TOKEN_STR,
-    TOKEN_IDN,
-    TOKEN_CMP_NEQ,
-    TOKEN_CMP_EQ,
-    TOKEN_CMP_LEQ,
-    TOKEN_CMP_GEQ,
+    TOKEN_int = 128, // integer numbers
+    TOKEN_flt,
+    TOKEN_str,
+    TOKEN_idn,
+    TOKEN_cmp_neq,
+    TOKEN_cmp_eq,
+    TOKEN_cmp_leq,
+    TOKEN_cmp_geq,
     
-    TOKEN_ADD_ASS,
-    TOKEN_SUB_ASS,
-    TOKEN_MUL_ASS,
-    TOKEN_DIV_ASS,
+    TOKEN_add_ass,
+    TOKEN_sub_ass,
+    TOKEN_mul_ass,
+    TOKEN_div_ass,
     
-    TOKEN_LEFT_ARROW,
+    TOKEN_left_arrow,
 } typedef t_token_kind;
 
+// TODO(bumbread): ignore this?
 enum {
-    TOKEN_SUBKIND_NONE,
-    TOKEN_SUBKIND_INT,
-    TOKEN_SUBKIND_CHAR,
+    SUBKIND_none,
+    SUBKIND_int,
+    SUBKIND_char,
 } typedef t_token_subkind;
 
 struct {
@@ -56,7 +57,7 @@ static void lex_init(t_lexstate *state, char const *filename, char const *stream
     state->offset = 1;
     t_token eof_token; // to be removed later
     eof_token.start = eof_token.end = null;
-    eof_token.kind = TOKEN_EOF;
+    eof_token.kind = TOKEN_eof;
     state->last_token = eof_token;
 }
 
@@ -151,7 +152,7 @@ static void lex_next_token(t_lexstate *state) {
     
     // lex identifiers
     if(isalpha(*state->stream) || *state->stream == '_') {
-        state->last_token.kind = TOKEN_IDN;
+        state->last_token.kind = TOKEN_idn;
         while(isalnum(*state->stream) || *state->stream == '_') {
             lex_next_char(state);
         }
@@ -183,8 +184,8 @@ static void lex_next_token(t_lexstate *state) {
                 else if(tolower(state->stream[1] == 'b')) base = 2;
             }
             state->last_token.int_value = lex_integer(base, state->stream, &state->stream);
-            state->last_token.subkind = TOKEN_SUBKIND_INT;
-            state->last_token.kind = TOKEN_INT;
+            state->last_token.subkind = SUBKIND_int;
+            state->last_token.kind = TOKEN_int;
         }
     }
     else if(lex_match_char(state, '\'')) { // character literal
@@ -199,8 +200,8 @@ static void lex_next_token(t_lexstate *state) {
         else {
             push_errorf("value %x is unacceptable for a char literal", *state->stream);
         }
-        state->last_token.kind = TOKEN_INT;
-        state->last_token.subkind = TOKEN_SUBKIND_CHAR;
+        state->last_token.kind = TOKEN_int;
+        state->last_token.subkind = SUBKIND_char;
         state->last_token.int_value = val;
         if(!lex_match_char(state, '\'')) {
             push_errorf("expected a char literal to close");
@@ -221,63 +222,63 @@ static void lex_next_token(t_lexstate *state) {
         char *result = string_builder_finish();
         t_intern const *intern = intern_string(result, result + string_builder.len);
         state->last_token.str_value = intern;
-        state->last_token.kind = TOKEN_STR;
+        state->last_token.kind = TOKEN_str;
     }
     else { // parse operators.
         
         if(lex_match_char(state, '=')) {
             state->last_token.kind = '=';
             if(lex_match_char(state, '=')) {
-                state->last_token.kind = TOKEN_CMP_EQ;
+                state->last_token.kind = TOKEN_cmp_eq;
             }
         }
         else if(lex_match_char(state, '!')) {
             state->last_token.kind = '!';
             if(lex_match_char(state, '=')) {
-                state->last_token.kind = TOKEN_CMP_NEQ;
+                state->last_token.kind = TOKEN_cmp_neq;
             }
         }
         else if(lex_match_char(state, '>')) {
             state->last_token.kind = '>';
             if(lex_match_char(state, '=')) {
-                state->last_token.kind = TOKEN_CMP_GEQ;
+                state->last_token.kind = TOKEN_cmp_geq;
             }
         }
         else if(lex_match_char(state, '<')) {
             state->last_token.kind = '<';
             if(lex_match_char(state, '=')) {
-                state->last_token.kind = TOKEN_CMP_LEQ;
+                state->last_token.kind = TOKEN_cmp_leq;
             }
             if(lex_match_char(state, '-')) {
-                state->last_token.kind = TOKEN_LEFT_ARROW;
+                state->last_token.kind = TOKEN_left_arrow;
             }
         }
         else if(lex_match_char(state, '+')) {
             state->last_token.kind = '+';
             if(lex_match_char(state, '=')) {
-                state->last_token.kind = TOKEN_ADD_ASS;
+                state->last_token.kind = TOKEN_add_ass;
             }
         }
         else if(lex_match_char(state, '-')) {
             state->last_token.kind = '-';
             if(lex_match_char(state, '=')) {
-                state->last_token.kind = TOKEN_SUB_ASS;
+                state->last_token.kind = TOKEN_sub_ass;
             }
         }
         else if(lex_match_char(state, '*')) {
             state->last_token.kind = '*';
             if(lex_match_char(state, '=')) {
-                state->last_token.kind = TOKEN_MUL_ASS;
+                state->last_token.kind = TOKEN_mul_ass;
             }
         }
         else if(lex_match_char(state, '/')) {
             state->last_token.kind = '/';
             if(lex_match_char(state, '=')) {
-                state->last_token.kind = TOKEN_DIV_ASS;
+                state->last_token.kind = TOKEN_div_ass;
             }
         }
         else if(*state->stream == 0) {
-            state->last_token.kind = TOKEN_EOF;
+            state->last_token.kind = TOKEN_eof;
         }
         else {
             state->last_token.kind = *state->stream;
@@ -294,10 +295,10 @@ static void lex_next_token(t_lexstate *state) {
 
 
 static char const *get_token_kind_name(t_token_kind kind) {
-    if(kind == TOKEN_INT) {return "INT";}
-    else if(kind == TOKEN_IDN) {return "NAME";}
-    else if(kind == TOKEN_FLT) {return "FLOAT";}
-    else if(kind == TOKEN_STR) {return "STRING";}
+    if(kind == TOKEN_int) {return "INT";}
+    else if(kind == TOKEN_idn) {return "NAME";}
+    else if(kind == TOKEN_flt) {return "FLOAT";}
+    else if(kind == TOKEN_str) {return "STRING";}
     else if(kind == '<') {return "<";}
     else if(kind == '>') {return ">";}
     else if(kind == '=') {return "=";}
@@ -323,18 +324,18 @@ static char const *get_token_kind_name(t_token_kind kind) {
     else if(kind == ']') {return "]";}
     else if(kind == '{') {return "{";}
     else if(kind == '}') {return "}";}
-    else if(kind == TOKEN_CMP_NEQ) {return "!=";}
-    else if(kind == TOKEN_CMP_EQ) {return "==";}
-    else if(kind == TOKEN_CMP_LEQ) {return "<=";}
-    else if(kind == TOKEN_CMP_GEQ) {return ">=";}
-    else if(kind == TOKEN_LEFT_ARROW) {return "<-";}
+    else if(kind == TOKEN_cmp_neq) {return "!=";}
+    else if(kind == TOKEN_cmp_eq) {return "==";}
+    else if(kind == TOKEN_cmp_leq) {return "<=";}
+    else if(kind == TOKEN_cmp_geq) {return ">=";}
+    else if(kind == TOKEN_left_arrow) {return "<-";}
     else if(kind == 0) {return "EOF";}
     return "{unknown token}";
 }
 
 static char const *get_token_string(t_token *token) {
     t_token_kind kind = token->kind;
-    if(kind == TOKEN_IDN) {
+    if(kind == TOKEN_idn) {
         return token->str_value->str;
     }
     return get_token_kind_name(kind);
@@ -372,14 +373,14 @@ static inline bool token_expect_kind(t_lexstate *state, t_token_kind kind) {
 }
 
 static inline bool token_is_identifier(t_lexstate *state, t_intern const *str) {
-    if(state->last_token.kind == TOKEN_IDN) {
+    if(state->last_token.kind == TOKEN_idn) {
         return state->last_token.str_value == str;
     }
     return false;
 }
 
 static inline bool token_match_identifier(t_lexstate *state, t_intern const *str) {
-    if(state->last_token.kind == TOKEN_IDN && state->last_token.str_value == str) {
+    if(state->last_token.kind == TOKEN_idn && state->last_token.str_value == str) {
         lex_next_token(state);
         return true;
     }
@@ -387,7 +388,7 @@ static inline bool token_match_identifier(t_lexstate *state, t_intern const *str
 }
 
 static inline bool token_expect_identifier(t_lexstate *state, t_intern const *str) {
-    if(state->last_token.kind == TOKEN_IDN && state->last_token.str_value == str) {
+    if(state->last_token.kind == TOKEN_idn && state->last_token.str_value == str) {
         lex_next_token(state);
         return true;
     }

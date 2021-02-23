@@ -3,10 +3,10 @@ static void token_print(t_token token) {
     if(token.kind < 128 && isprint(token.kind)) {
         printf(" `%c` ", token.kind);
     }
-    else if(token.kind == TOKEN_INT) {
+    else if(token.kind == TOKEN_int) {
         printf(" %lld ", token.int_value);
     }
-    else if(token.kind == TOKEN_IDN) {
+    else if(token.kind == TOKEN_idn) {
         printf(" [%.*s] ", (int)(token.end - token.start), token.start);
     }
     else {
@@ -15,10 +15,10 @@ static void token_print(t_token token) {
 }
 
 #define test_token_op(op)   lex_next_token(&state); assert(state.last_token.kind == (op))
-#define test_token_int(val) lex_next_token(&state); assert(state.last_token.kind == TOKEN_INT && state.last_token.int_value == (val))
-#define test_token_flt(val) lex_next_token(&state); assert(state.last_token.kind == TOKEN_FLT && state.last_token.flt_value == (val))
-#define test_token_chr(val) lex_next_token(&state); assert(state.last_token.kind == TOKEN_INT && state.last_token.subkind == TOKEN_SUBKIND_CHAR && state.last_token.int_value == (val))
-#define test_token_str(val) intern = intern_cstring(val); lex_next_token(&state); assert(state.last_token.kind == TOKEN_STR && intern == state.last_token.str_value);
+#define test_token_int(val) lex_next_token(&state); assert(state.last_token.kind == TOKEN_int && state.last_token.int_value == (val))
+#define test_token_flt(val) lex_next_token(&state); assert(state.last_token.kind == TOKEN_flt && state.last_token.flt_value == (val))
+#define test_token_chr(val) lex_next_token(&state); assert(state.last_token.kind == TOKEN_int && state.last_token.subkind == SUBKIND_char && state.last_token.int_value == (val))
+#define test_token_str(val) intern = intern_cstring(val); lex_next_token(&state); assert(state.last_token.kind == TOKEN_str && intern == state.last_token.str_value);
 static void test_lexing(void) {
     
     // operators.
@@ -27,13 +27,13 @@ static void test_lexing(void) {
     lex_init(&state, "", string);
     test_token_op('+');
     test_token_op('-');
-    test_token_op(TOKEN_CMP_EQ);
-    test_token_op(TOKEN_CMP_LEQ);
+    test_token_op(TOKEN_cmp_eq);
+    test_token_op(TOKEN_cmp_leq);
     test_token_op('>');
     test_token_op('<');
-    test_token_op(TOKEN_CMP_NEQ);
+    test_token_op(TOKEN_cmp_neq);
     test_token_op('!');
-    test_token_op(TOKEN_LEFT_ARROW);
+    test_token_op(TOKEN_left_arrow);
     
     
     // integer literals
