@@ -368,7 +368,7 @@ static t_ast_node *parse_expr1(t_lexstate *state) {
 static t_ast_node *parse_expr2(t_lexstate *state) {
     // sub
     if(token_match_kind(state, '-')) {
-        t_ast_node *expr = parse_expr1(state);
+        t_ast_node *expr = parse_expr2(state);
         if(expr == null) return null;
         t_ast_node *node = alloc_node();
         node->cat = AST_expr_node;
@@ -380,7 +380,7 @@ static t_ast_node *parse_expr2(t_lexstate *state) {
     
     // address-of
     else if(token_match_kind(state, '$')) {
-        t_ast_node *expr = parse_expr1(state);
+        t_ast_node *expr = parse_expr2(state);
         if(expr == null) return null;
         t_ast_node *node = alloc_node();
         node->cat = AST_expr_node;
@@ -392,7 +392,7 @@ static t_ast_node *parse_expr2(t_lexstate *state) {
     
     // deref
     else if(token_match_kind(state, '@')) {
-        t_ast_node *expr = parse_expr1(state);
+        t_ast_node *expr = parse_expr2(state);
         if(expr == null) return null;
         t_ast_node *node = alloc_node();
         node->cat = AST_expr_node;

@@ -52,7 +52,7 @@ int main(void) {
     check_errors();
 #endif
     
-    t_ast_node *code = parse_ast_node_expr_level("2 + + 2*2");
+    t_ast_node *code = parse_ast_node_expr_level("@(-2)[-1:2+2*2]");
     printf("output tree:\n\n");
     ast_node_print_lisp(code, 0);
     printf("\n");
