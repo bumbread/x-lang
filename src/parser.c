@@ -5,6 +5,7 @@ struct t_value_node_ typedef t_value_node;
 struct t_stmt_node_ typedef t_stmt_node;
 
 enum {
+    AST_wtf,
     AST_list_node,
     AST_expr_node,
     AST_type_node,
@@ -78,6 +79,7 @@ enum {
 } typedef t_operator_cat;
 
 enum {
+    EXPR_wtf,
     EXPR_variable,
     EXPR_int_value,
     EXPR_float_value,
@@ -111,6 +113,7 @@ struct t_expr_node_ {
 };
 
 enum {
+    STMT_wtf,
     STMT_if,
     STMT_while,
     STMT_return,
@@ -187,6 +190,7 @@ static t_ast_node *type_byte;
 
 static t_ast_node *alloc_node(void) {
     t_ast_node *result = global_alloc(sizeof(t_ast_node));
+    memset(result, 0, sizeof(t_ast_node));
     return result;
 }
 
