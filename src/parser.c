@@ -753,14 +753,23 @@ static t_ast_node *parse_if_stmt(t_lexstate *state) {
     token_expect_identifier(state, keyword_if);
     t_ast_node *node = alloc_node();
     t_ast_node *condition = parse_expr(state);
-    t_ast_node *block = parse_stmts(state);
+    t_ast_node *block;
+    if(token_is_kind(state, ';')) {
+        block = null;
+    }
+    else {
+        block = parse_stmts(state);
+    }
     if(token_match_identifier(state, keyword_else)) {
         t_ast_node *else_stmt;
         if(token_is_kind(state, '{')) {
             else_stmt = parse_stmts(state);
         }
+        else if(token_match_kind(state, ';')) {
+            else_stmt = null;
+        }
         else {
-            else_stmt = parse_stmts(state);
+            else_stmt = parse_stmt(state);
             token_expect_kind(state, ';');
         }
         node->stmt.if_false_block = else_stmt;
@@ -776,7 +785,13 @@ static t_ast_node *parse_if_stmt(t_lexstate *state) {
 static t_ast_node *parse_while_stmt(t_lexstate *state) {
     token_expect_identifier(state, keyword_while);
     t_ast_node *condition = parse_expr(state);
-    t_ast_node *block = parse_stmts(state);
+    t_ast_node *block;
+    if(token_is_kind(state, ';')) {
+        block = null;
+    }
+    else {
+        block = parse_stmts(state);
+    }
     t_ast_node *node = alloc_node();
     node->cat = AST_stmt_node;
     node->stmt.cat = STMT_while;
@@ -943,10 +958,14 @@ static t_ast_node *parse_stmt(t_lexstate *state) {
     else if(token_is_kind(state, '{')) {
         node = parse_stmts(state);
     }
+    else if(token_match_kind(state, ';')) {
+        return null;
+    }
     else {
         node = parse_assignment(state);
         token_expect_kind(state, ';');
     }
+    assert(node != null);
     return node;
 }
 
@@ -962,9 +981,11 @@ static t_ast_node *parse_stmts(t_lexstate *state) {
         }
         else {
             t_ast_node *node = parse_stmt(state);
-            t_ast_list_link *link = alloc_list_link();
-            link->p = node;
-            node_list_push(&block->stmt.statements, link);
+            if(node != null) {
+                t_ast_list_link *link = alloc_list_link();
+                link->p = node;
+                node_list_push(&block->stmt.statements, link);
+            }
         }
     }
     return block;
