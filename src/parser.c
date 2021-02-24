@@ -837,6 +837,8 @@ static t_ast_node *parse_type(t_lexstate *state) {
             }
             t_ast_node *decls = alloc_node();
             decls->cat = AST_list_node;
+            decls->list.first = null;
+            decls->list.last = null;
             t_ast_node *function_node = alloc_node();
             function_node->cat = AST_type_node;
             function_node->type.cat = TYPE_function;
@@ -886,40 +888,41 @@ static t_ast_node *parse_type(t_lexstate *state) {
 }
 
 static t_ast_node *parse_declaration(t_lexstate *state) {
-    token_expect_kind(state, ':');
-    
-    t_ast_node *node = alloc_node();
-    node->cat = AST_stmt_node;
-    node->stmt.cat = STMT_declaration;
-    node->stmt.decl_type = parse_type(state);
-    
-    t_token name = state->last_token;
-    if(token_expect_kind(state, TOKEN_idn)) {
-        node->stmt.decl_name = name.str_value;
-    }
-    
-    if(token_match_kind(state, '=')) {
-        node->stmt.decl_value = parse_expr(state);
-        token_expect_kind(state, ';');
-    }
-    else if(token_is_kind(state, '{')) {
-        node->stmt.decl_value = parse_stmts(state);
-    }
-    else {
-        if(!token_expect_kind(state, ';')) {
-            return null;
+    if(token_expect_kind(state, ':')) {
+        t_ast_node *node = alloc_node();
+        node->cat = AST_stmt_node;
+        node->stmt.cat = STMT_declaration;
+        node->stmt.decl_type = parse_type(state);
+        
+        t_token name = state->last_token;
+        if(token_expect_kind(state, TOKEN_idn)) {
+            node->stmt.decl_name = name.str_value;
         }
+        
+        if(token_match_kind(state, '=')) {
+            node->stmt.decl_value = parse_expr(state);
+            token_expect_kind(state, ';');
+        }
+        else if(token_is_kind(state, '{')) {
+            node->stmt.decl_value = parse_stmts(state);
+        }
+        else {
+            if(!token_expect_kind(state, ';')) {
+                return null;
+            }
+        }
+        
+        assert(node->stmt.decl_type != null);
+        t_ast_node *decl_type = node->stmt.decl_type;
+        assert(decl_type->cat == AST_type_node);
+        if(decl_type->type.cat == TYPE_function) {
+            t_ast_list_link *func_link = alloc_list_link();
+            func_link->p = node;
+            node_list_push(&all_procs, func_link);
+        }
+        return node;
     }
-    
-    assert(node->stmt.decl_type != null);
-    t_ast_node *decl_type = node->stmt.decl_type;
-    assert(decl_type->cat == AST_type_node);
-    if(decl_type->type.cat == TYPE_function) {
-        t_ast_list_link *func_link = alloc_list_link();
-        func_link->p = node;
-        node_list_push(&all_procs, func_link);
-    }
-    return node;
+    return null;
 }
 
 static t_ast_node *parse_stmt(t_lexstate *state) {

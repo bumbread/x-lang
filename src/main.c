@@ -19,9 +19,11 @@
 
 //#include"output/c_output.c"
 //#include"output/lisp_output.c"
-#include"output/tree_output.c"
+//#include"output/tree_output.c"
+#include"output/python_output.c"
 
 int main(void) {
+    
     init_errors(20);
     string_builder_init();
     
@@ -32,12 +34,13 @@ int main(void) {
     parser_init_memory();
     //checker_init_types();
     
-#if 0    
     byte *buf;
     char const *filename = "test.x";
     FILE *input = fopen(filename, "rb");
+    
     if(null == input) {
         printf("filename '%s' not found\n", filename);
+        return 1;
     }
     
     fseek(input, 0, SEEK_END);
@@ -51,12 +54,16 @@ int main(void) {
     lex_next_token(&state);
     t_ast_node *code = parse_global_scope(&state);
     check_errors();
-#endif
     
-    t_ast_node *code = parse_ast_node_stmt_level("{:int a = 3;while a {print 3; while 3 {return;}}if 3 {return 2;}}");
+    ast_node_print_python(code, 0);
+    printf("\n\n");
+    
+#if 0    
+    t_ast_node *code = parse_ast_node_global_level(":int");
     printf("\n\noutput tree:\n\n");
     ast_node_print_tree(code, 0);
     printf("\n");
+#endif
     
 #if 0
     char const *output_filename = "test.c";
