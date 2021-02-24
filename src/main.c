@@ -18,7 +18,8 @@
 #include"test.c"
 
 //#include"output/c_output.c"
-#include"output/lisp_output.c"
+//#include"output/lisp_output.c"
+#include"output/tree_output.c"
 
 int main(void) {
     init_errors(20);
@@ -52,9 +53,9 @@ int main(void) {
     check_errors();
 #endif
     
-    t_ast_node *code = parse_ast_node_stmt_level("if(a);");
+    t_ast_node *code = parse_ast_node_stmt_level("{:int a = 3;while a {print 3; while 3 {return;}}if 3 {return 2;}}");
     printf("output tree:\n\n");
-    ast_node_print_lisp(code, 0);
+    ast_node_print_tree(code, 0);
     printf("\n");
     
 #if 0

@@ -933,7 +933,12 @@ static t_ast_node *parse_stmt(t_lexstate *state) {
         node = alloc_node();
         node->cat = AST_stmt_node;
         node->stmt.cat = STMT_return;
-        node->stmt.stmt_value = parse_expr(state);
+        if(!token_is_kind(state, ';')) {
+            node->stmt.stmt_value = parse_expr(state);
+        }
+        else {
+            node->stmt.stmt_value = null;
+        }
         token_expect_kind(state, ';');
     }
     else if(token_match_identifier(state, keyword_break)) {
