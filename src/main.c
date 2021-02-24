@@ -54,7 +54,7 @@ int main(void) {
 #endif
     
     t_ast_node *code = parse_ast_node_stmt_level("{:int a = 3;while a {print 3; while 3 {return;}}if 3 {return 2;}}");
-    printf("output tree:\n\n");
+    printf("\n\noutput tree:\n\n");
     ast_node_print_tree(code, 0);
     printf("\n");
     

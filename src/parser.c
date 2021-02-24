@@ -877,6 +877,9 @@ static t_ast_node *parse_type(t_lexstate *state) {
                 return null;
             }
         }
+        else {
+            break;
+        }
     }
     
     return node;
@@ -887,6 +890,7 @@ static t_ast_node *parse_declaration(t_lexstate *state) {
     
     t_ast_node *node = alloc_node();
     node->cat = AST_stmt_node;
+    node->stmt.cat = STMT_declaration;
     node->stmt.decl_type = parse_type(state);
     
     t_token name = state->last_token;
