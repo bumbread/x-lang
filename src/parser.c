@@ -49,6 +49,7 @@ struct t_type_node_ {
 };
 
 enum {
+    op_wtf,
     UNARY_FIRST_OPERATOR, // no touching
     UNARY_add,
     UNARY_sub,
@@ -67,11 +68,13 @@ enum {
     BINARY_neq,
     BINARY_and,
     BINARY_or,
+    BINARY_FIRST_ASS, // no touching
     BINARY_ass,
     BINARY_add_ass,
     BINARY_sub_ass,
     BINARY_mul_ass,
     BINARY_div_ass,
+    BINARY_LAST_ASS, // no touching
     BINARY_function_call,
     BINARY_subscript,
     TERNARY_FIRST_OPERATOR, // no touching
@@ -1091,4 +1094,8 @@ static bool op_is_binary(t_operator_cat cat) {
 
 static bool op_is_ternary(t_operator_cat cat) {
     return cat > TERNARY_FIRST_OPERATOR && cat < LAST_OPERATOR;
+}
+
+static bool op_is_assignment(t_operator_cat cat) {
+    return cat > BINARY_FIRST_ASS && cat < BINARY_LAST_ASS;
 }
