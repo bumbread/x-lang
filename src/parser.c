@@ -96,7 +96,7 @@ enum {
 typedef struct t_expr_node_ t_expr_node;
 struct t_expr_node_ {
     t_expr_cat cat;
-    t_type_node *type;
+    t_ast_node *type;
     union {
         // operators
         struct {
@@ -157,7 +157,6 @@ struct t_stmt_node_ {
 
 struct t_ast_node_ {
     t_ast_node_cat cat;
-    t_ast_node *scope;
     union {
         t_expr_node expr;
         t_type_node type;
@@ -167,6 +166,7 @@ struct t_ast_node_ {
 };
 
 static t_ast_list all_procs;
+static t_ast_node *parser_scope = null;
 
 static t_intern const *keyword_if;
 static t_intern const *keyword_else;
@@ -185,6 +185,8 @@ static t_intern const *keyword_byte;
 static t_intern const *keyword_int;
 static t_intern const *keyword_float;
 static t_intern const *keyword_string;
+
+static t_intern const *main_name;
 
 static t_ast_node *type_float;
 static t_ast_node *type_string;
@@ -237,6 +239,8 @@ static void parser_init_memory(void) {
     keyword_float    = intern_cstring("float");
     keyword_string   = intern_cstring("string");
     
+    keyword_string   = intern_cstring("main");
+    
     type_int = alloc_node();
     type_bool = alloc_node();
     type_byte = alloc_node();
@@ -286,22 +290,22 @@ static void load_expr_node_data(t_ast_node *node, t_token *tok) {
         case TOKEN_int: {
             node->expr.cat = EXPR_int_value;
             node->expr.ivalue = tok->int_value;
-            node->expr.type = &type_int->type;
+            node->expr.type = type_int;
         } break;
         case TOKEN_flt: {
             node->expr.cat = EXPR_float_value;
             node->expr.fvalue = tok->flt_value;
-            node->expr.type = &type_float->type;
+            node->expr.type = type_float;
         } break;
         case TOKEN_str: {
             node->expr.cat = EXPR_string_value;
             node->expr.svalue = tok->str_value;
-            node->expr.type = &type_string->type;
+            node->expr.type = type_string;
         } break;
         case TOKEN_idn: {
             node->expr.cat = EXPR_variable;
             node->expr.var_name = tok->str_value;
-            node->expr.type = null; // to be derived later;
+            node->expr.type = null; // to be derived on the typecheck stage
         } break;
         default:
         assert(false);
@@ -744,7 +748,6 @@ static t_ast_node *parse_assignment(t_lexstate *state) {
             operand_left = node;
         }
     }
-    //token_expect(state, ';');
     return operand_left;
 }
 

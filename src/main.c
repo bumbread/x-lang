@@ -18,9 +18,7 @@
 #include"test.c"
 
 //#include"output/c_output.c"
-//#include"output/lisp_output.c"
-//#include"output/tree_output.c"
-#include"output/python_output.c"
+#include"output/tree_output.c"
 
 int main(void) {
     
@@ -55,7 +53,7 @@ int main(void) {
     t_ast_node *code = parse_global_scope(&state);
     check_errors();
     
-    ast_node_print_python(code, 0);
+    ast_node_print_tree(code, 0);
     printf("\n\n");
     
 #if 0    
