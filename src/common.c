@@ -20,41 +20,77 @@ u64      typedef ptr;
 #define  gb      1024*mb
 
 void panicf(char *message, ...) {
-    va_list args;
-    va_start(args, message);
-    vprintf(message, args);
-    va_end(args);
-    exit(1);
+  va_list args;
+  va_start(args, message);
+  vprintf(message, args);
+  va_end(args);
+  exit(1);
 }
 
 static int max_errors = -1;
 static int now_errors = 0;
 static char (*errors)[1024];
 
-void init_errors(int set_max_errors) {
-    max_errors = set_max_errors;
-    errors = malloc(set_max_errors * sizeof(char[1024]));
+void init_error_buffer(int set_max_errors) {
+  max_errors = set_max_errors;
+  errors = malloc(set_max_errors * sizeof(char[1024]));
 }
 
 void push_errorf(char const *message, ...) {
-    if(now_errors < max_errors) {
-        va_list args;
-        va_start(args, message);
-        vsprintf(errors[now_errors], message, args);
-        va_end(args);
-        now_errors += 1;
-    }
-    else exit(1);
+  if(now_errors < max_errors) {
+    va_list args;
+    va_start(args, message);
+    vsprintf(errors[now_errors], message, args);
+    va_end(args);
+    now_errors += 1;
+  }
+  else exit(1);
 }
 
-void check_errors(void) {
-    for(int error_index = 0; error_index < now_errors; error_index += 1) {
-        printf("%s\n", errors[error_index]);
-    }
+void print_error_buffer(void) {
+  for(int error_index = 0; error_index < now_errors; error_index += 1) {
+    printf("%s\n", errors[error_index]);
+  }
 }
 
 static void print_level(int level) {
-    for(int i = 0; i < level; i += 1) {
-        printf("  ");
-    }
+  for(int i = 0; i < level; i += 1) {
+    printf("  ");
+  }
+}
+
+static u64 char_to_digit[256] = {
+  ['0'] = 0,
+  ['1'] = 1,
+  ['2'] = 2,
+  ['3'] = 3,
+  ['4'] = 4,
+  ['5'] = 5,
+  ['6'] = 6,
+  ['7'] = 7,
+  ['8'] = 8,
+  ['9'] = 9,
+  ['a'] = 10,['A'] = 10,
+  ['b'] = 11,['B'] = 11,
+  ['c'] = 12,['C'] = 12,
+  ['d'] = 13,['D'] = 13,
+  ['e'] = 14,['E'] = 14,
+  ['f'] = 15,['F'] = 15,
+};
+
+static u64 escape_char[256] = {
+  ['n'] = '\n',
+  ['t'] = '\t',
+  ['r'] = '\r',
+  ['a'] = '\a',
+  ['b'] = '\b',
+  ['v'] = '\v',
+  ['\\'] = '\\',
+  ['\''] = '\'',
+  ['"'] = '"',
+};
+
+static bool is_digit_in_base(u64 base, char c) {
+  u64 digit = char_to_digit[c];
+  return (digit < base) && (digit != 0 || c == '0');
 }
