@@ -277,24 +277,6 @@ struct t_ast_node_ {
 static t_ast_list all_procs;
 static t_ast_node *parser_scope = null;
 
-static t_intern const *keyword_if;
-static t_intern const *keyword_else;
-static t_intern const *keyword_while;
-
-static t_intern const *keyword_break;
-static t_intern const *keyword_continue;
-static t_intern const *keyword_return;
-static t_intern const *keyword_print;
-
-static t_intern const *keyword_and;
-static t_intern const *keyword_or;
-
-static t_intern const *keyword_bool;;
-static t_intern const *keyword_byte;
-static t_intern const *keyword_int;
-static t_intern const *keyword_float;
-static t_intern const *keyword_string;
-
 static t_intern const *main_name;
 
 static t_ast_node *type_float;
@@ -302,3 +284,74 @@ static t_ast_node *type_string;
 static t_ast_node *type_bool;
 static t_ast_node *type_int;
 static t_ast_node *type_byte;
+
+static void init_primitive_type(t_ast_node *type, t_intern const *keyword) {
+  type->cat = AST_type_node;
+  type->type.cat = TYPE_alias;
+  type->type.name = keyword;
+}
+
+
+#define KEYWORD_spec \
+KEYWORD_param(keyword_if,       "if")\
+KEYWORD_param(keyword_else,     "else")\
+KEYWORD_param(keyword_while,    "while")\
+KEYWORD_param(keyword_break,    "break")\
+KEYWORD_param(keyword_continue, "continue")\
+KEYWORD_param(keyword_return,   "return")\
+KEYWORD_param(keyword_print,    "print")\
+KEYWORD_param(keyword_and,      "and")\
+KEYWORD_param(keyword_or,       "or")\
+KEYWORD_param(keyword_bool,     "bool")\
+KEYWORD_param(keyword_byte,     "byte")\
+KEYWORD_param(keyword_int,      "int")\
+KEYWORD_param(keyword_float,    "float")\
+KEYWORD_param(keyword_string,   "string")
+
+// array of all keywords for looping
+static t_intern const *keywords[] = {
+#define KEYWORD_param(var, str) 0,
+  KEYWORD_spec
+#undef KEYWORD_param
+};
+static u64 keywords_num = 0;
+
+// static keyword definitions
+#define KEYWORD_param(var, str) static t_intern const *var;
+KEYWORD_spec
+#undef KEYWORD_param
+
+
+static t_ast_node *alloc_node(void) {
+  t_ast_node *result = global_alloc(sizeof(t_ast_node));
+  memset(result, 0, sizeof(t_ast_node));
+  return result;
+}
+
+static void init_compiler(void) {
+  // intern keywords
+#define KEYWORD_param(var, str) var = intern_cstring(str);
+  KEYWORD_spec
+#undef KEYWORD_param
+  // fill the keyword array with interns
+#define KEYWORD_param(var,str) keywords[keywords_num++] = var;
+  KEYWORD_spec
+#undef KEYWORD_param
+  
+  keyword_string   = intern_cstring("main");
+  
+  type_int = alloc_node();
+  type_bool = alloc_node();
+  type_byte = alloc_node();
+  type_float = alloc_node();
+  type_string = alloc_node();
+  
+  init_primitive_type(type_int, keyword_int);
+  init_primitive_type(type_bool, keyword_bool);
+  init_primitive_type(type_byte, keyword_byte);
+  init_primitive_type(type_float, keyword_float);
+  init_primitive_type(type_string, keyword_string);
+  
+  all_procs.first = null;
+  all_procs.last = null;
+}

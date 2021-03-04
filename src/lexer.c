@@ -68,6 +68,7 @@ static void lex_next_token(t_lexstate *state) {
   }
   
   char const *start = state->stream;
+  state->last_token.flags = 0;
   
   // lex identifiers
   if(isalpha(*state->stream) || *state->stream == '_') {
@@ -78,6 +79,14 @@ static void lex_next_token(t_lexstate *state) {
     char const *end = state->stream;
     t_intern const *string_value = intern_string(start, end);
     state->last_token.str_value = string_value;
+    
+    bool is_keyword = false;
+    for(u64 keyword_index = 0; keyword_index < keywords_num; keyword_index += 1) {
+      if(keywords[keyword_index] == string_value) {
+        is_keyword = true;
+      }
+    }
+    state->last_token.flags |= (is_keyword << FLAG_keyword);
   }
   
   // lex number literals
@@ -208,7 +217,7 @@ static void lex_next_token(t_lexstate *state) {
 }
 
 static inline bool token_is_keyword(t_token *token) {
-  return (token->flags & FLAG_keyword) != 0;
+  return (token->flags & (1<<FLAG_keyword)) != 0;
 }
 
 static inline bool token_is_kind(t_lexstate *state, t_token_kind kind) {

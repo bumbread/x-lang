@@ -30,7 +30,7 @@ int main(void) {
   test_interns();
   
   init_interns(malloc);
-  parser_init_memory();
+  init_compiler();
   //checker_init_types();
   
   byte *buf;

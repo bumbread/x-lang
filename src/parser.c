@@ -1,10 +1,4 @@
 
-static t_ast_node *alloc_node(void) {
-  t_ast_node *result = global_alloc(sizeof(t_ast_node));
-  memset(result, 0, sizeof(t_ast_node));
-  return result;
-}
-
 static t_ast_list *alloc_list(void) {
   t_ast_list *result = global_alloc(sizeof(t_ast_list));
   result->first = null;
@@ -17,49 +11,6 @@ static t_ast_list_link *alloc_list_link(void) {
   result->next = null;
   result->prev = null;
   return result;
-}
-
-static void init_primitive_type(t_ast_node *type, t_intern const *keyword) {
-  type->cat = AST_type_node;
-  type->type.cat = TYPE_alias;
-  type->type.name = keyword;
-}
-
-static void parser_init_memory(void) {
-  keyword_if       = intern_cstring("if");
-  keyword_else     = intern_cstring("else");
-  keyword_while    = intern_cstring("while");
-  
-  keyword_break    = intern_cstring("break");
-  keyword_continue = intern_cstring("continue");
-  keyword_return   = intern_cstring("return");
-  keyword_print    = intern_cstring("print");
-  
-  keyword_and      = intern_cstring("and");
-  keyword_or       = intern_cstring("or");
-  
-  keyword_bool     = intern_cstring("bool");
-  keyword_byte     = intern_cstring("byte");
-  keyword_int      = intern_cstring("int");
-  keyword_float    = intern_cstring("float");
-  keyword_string   = intern_cstring("string");
-  
-  keyword_string   = intern_cstring("main");
-  
-  type_int = alloc_node();
-  type_bool = alloc_node();
-  type_byte = alloc_node();
-  type_float = alloc_node();
-  type_string = alloc_node();
-  
-  init_primitive_type(type_int, keyword_int);
-  init_primitive_type(type_bool, keyword_bool);
-  init_primitive_type(type_byte, keyword_byte);
-  init_primitive_type(type_float, keyword_float);
-  init_primitive_type(type_string, keyword_string);
-  
-  all_procs.first = null;
-  all_procs.last = null;
 }
 
 static inline bool unexpected_last_token(t_lexstate *state) {
@@ -689,6 +640,9 @@ static t_ast_node *parse_declaration(t_lexstate *state) {
     
     t_token name = state->last_token;
     if(token_expect_kind(state, TOKEN_idn)) {
+      if(token_is_keyword(&name)) {
+        push_errorf("keywords are not allowed as variable name", name.loc);
+      }
       node->stmt.decl_name = name.str_value;
     }
     

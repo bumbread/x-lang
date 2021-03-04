@@ -19,6 +19,8 @@ u64      typedef ptr;
 #define  mb      1024*kb
 #define  gb      1024*mb
 
+#define array_count(arr) (sizeof(arr)/sizeof((arr)[0]))
+
 void panicf(char *message, ...) {
   va_list args;
   va_start(args, message);
