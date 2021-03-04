@@ -473,70 +473,70 @@ static t_ast_node *parse_expr(t_lexstate *state) {
 
 
 static t_ast_node *parse_assignment(t_lexstate *state) {
-  t_ast_node *operand_left = parse_expr7(state);
-  if(null != operand_left) {
+  t_ast_node *assign_node = parse_expr7(state);
+  if(null != assign_node) {
+    
     if(token_is_kind(state, TOKEN_add_ass)) {
-      
       lex_next_token(state);
       t_ast_node *operand_right = parse_expr7(state);
       t_ast_node *node = alloc_node();
-      node->cat = AST_expr_node;
-      node->expr.cat = EXPR_binary_op;
-      node->expr.op = BINARY_add_ass;
-      node->expr.opr1 = operand_left;
-      node->expr.opr2 = operand_right;
-      operand_left = node;
+      node->cat = AST_stmt_node;
+      node->stmt.cat = STMT_assignment;
+      node->stmt.ass_op = BINARY_add_ass;
+      node->stmt.lvalue = assign_node;
+      node->stmt.rvalue = operand_right;
+      assign_node = node;
     }
+    
     else if(token_is_kind(state, TOKEN_sub_ass)) {
-      
       lex_next_token(state);
       t_ast_node *operand_right = parse_expr7(state);
       t_ast_node *node = alloc_node();
-      node->cat = AST_expr_node;
-      node->expr.cat = EXPR_binary_op;
-      node->expr.op = BINARY_geq;
-      node->expr.opr1 = operand_left;
-      node->expr.opr2 = operand_right;
-      operand_left = node;
+      node->cat = AST_stmt_node;
+      node->stmt.cat = STMT_assignment;
+      node->stmt.ass_op = BINARY_sub_ass;
+      node->stmt.lvalue = assign_node;
+      node->stmt.rvalue = operand_right;
+      assign_node = node;
     }
+    
     else if(token_is_kind(state, TOKEN_mul_ass)) {
-      
       lex_next_token(state);
       t_ast_node *operand_right = parse_expr7(state);
       t_ast_node *node = alloc_node();
-      node->cat = AST_expr_node;
-      node->expr.cat = EXPR_binary_op;
-      node->expr.op = BINARY_mul_ass;
-      node->expr.opr1 = operand_left;
-      node->expr.opr2 = operand_right;
-      operand_left = node;
+      node->cat = AST_stmt_node;
+      node->stmt.cat = STMT_assignment;
+      node->stmt.ass_op = BINARY_mul_ass;
+      node->stmt.lvalue = assign_node;
+      node->stmt.rvalue = operand_right;
+      assign_node = node;
     }
+    
     else if(token_is_kind(state, TOKEN_div_ass)) {
-      
       lex_next_token(state);
       t_ast_node *operand_right = parse_expr7(state);
       t_ast_node *node = alloc_node();
-      node->cat = AST_expr_node;
-      node->expr.cat = EXPR_binary_op;
-      node->expr.op = BINARY_div_ass;
-      node->expr.opr1 = operand_left;
-      node->expr.opr2 = operand_right;
-      operand_left = node;
+      node->cat = AST_stmt_node;
+      node->stmt.cat = STMT_assignment;
+      node->stmt.ass_op = BINARY_div_ass;
+      node->stmt.lvalue = assign_node;
+      node->stmt.rvalue = operand_right;
+      assign_node = node;
     }
+    
     else if(token_is_kind(state, '=')) {
-      
       lex_next_token(state);
       t_ast_node *operand_right = parse_expr7(state);
       t_ast_node *node = alloc_node();
-      node->cat = AST_expr_node;
-      node->expr.cat = EXPR_binary_op;
-      node->expr.op = BINARY_ass;
-      node->expr.opr1 = operand_left;
-      node->expr.opr2 = operand_right;
-      operand_left = node;
+      node->cat = AST_stmt_node;
+      node->stmt.cat = STMT_assignment;
+      node->stmt.ass_op = BINARY_ass;
+      node->stmt.lvalue = assign_node;
+      node->stmt.rvalue = operand_right;
+      assign_node = node;
     }
   }
-  return operand_left;
+  return assign_node;
 }
 
 

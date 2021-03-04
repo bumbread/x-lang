@@ -163,6 +163,7 @@ struct t_expr_node_ {
 
 enum {
   STMT_wtf,
+  STMT_assignment,
   STMT_if,
   STMT_while,
   STMT_return,
@@ -176,6 +177,13 @@ enum {
 struct t_stmt_node_ {
   t_ast_stmt_category cat;
   union {
+    // assignment
+    struct {
+      // has to be an assignment operator
+      t_operator_cat ass_op;
+      t_ast_node *lvalue;
+      t_ast_node *rvalue;
+    };
     // declarations
     struct {
       t_intern const *decl_name;
