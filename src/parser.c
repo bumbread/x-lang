@@ -70,12 +70,10 @@ static inline bool unexpected_last_token(t_lexstate *state) {
   return false;
 }
 
-static inline void parse_error(t_lexstate *state, char const *string) {
-  // TODO(bumbread): make sure that last_token is the place where this
-  // error occurs when this function is called.
+static inline void parse_error(char const *string, t_location loc) {
   push_errorf("%s(%d, %d): %s",
-              state->filename,
-              state->last_token.loc.line, state->last_token.loc.offset,
+              loc.filename,
+              loc.line, loc.offset,
               string);
 }
 
@@ -138,7 +136,6 @@ static t_ast_node *parse_expr_list(t_lexstate *state,
     t_ast_node *value = parse_expr(state);
     assert(value);
     if(value == null) {
-      parse_error(state, "error parsing expression in expr-list.");
       return node;
     }
     t_ast_list_link *link = alloc_list_link();
@@ -648,7 +645,7 @@ static t_ast_node *parse_type(t_lexstate *state) {
         t_ast_node *parameter_type = parse_type(state);
         assert(parameter_type->cat == AST_type_node);
         if(parameter_type == null) {
-          parse_error(state, "no type in function declarator");
+          parse_error("no type in function declarator", state->loc);
         }
         t_intern const *opt_param_name = null;
         t_token parameter_name = state->last_token;
@@ -819,7 +816,7 @@ static t_ast_node *parse_global_scope(t_lexstate *state) {
     else {
       t_ast_node *node = parse_declaration(state);
       if(node == null) {
-        parse_error(state, "unable to parse declaration");
+        parse_error("unable to parse declaration", state->loc);
         return block;
       }
       t_ast_list_link *link = alloc_list_link();

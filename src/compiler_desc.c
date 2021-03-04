@@ -2,6 +2,7 @@
 // TOKENS
 
 struct {
+  char const *filename;
   u64 line;
   u64 offset;
 } typedef t_location;
@@ -45,6 +46,57 @@ struct {
     t_intern const *str_value;
   };
 } typedef t_token;
+
+static char const *get_token_kind_name(t_token_kind kind) {
+  if(kind == TOKEN_int) {return "INT";}
+  else if(kind == TOKEN_idn) {return "NAME";}
+  else if(kind == TOKEN_flt) {return "FLOAT";}
+  else if(kind == TOKEN_str) {return "STRING";}
+  else if(kind == '<') {return "<";}
+  else if(kind == '>') {return ">";}
+  else if(kind == '=') {return "=";}
+  else if(kind == '!') {return "!";}
+  else if(kind == '-') {return "-";}
+  else if(kind == '+') {return "+";}
+  else if(kind == '*') {return "*";}
+  else if(kind == '/') {return "/";}
+  else if(kind == '@') {return "@";}
+  else if(kind == '$') {return "$";}
+  else if(kind == '#') {return "#";}
+  else if(kind == '%') {return "%";}
+  else if(kind == '^') {return "^";}
+  else if(kind == '&') {return "&";}
+  else if(kind == '|') {return "|";}
+  else if(kind == ':') {return ":";}
+  else if(kind == ';') {return ";";}
+  else if(kind == ',') {return ",";}
+  else if(kind == '?') {return "?";}
+  else if(kind == '(') {return "(";}
+  else if(kind == ')') {return ")";}
+  else if(kind == '[') {return "[";}
+  else if(kind == ']') {return "]";}
+  else if(kind == '{') {return "{";}
+  else if(kind == '}') {return "}";}
+  else if(kind == TOKEN_cmp_neq) {return "!=";}
+  else if(kind == TOKEN_cmp_eq) {return "==";}
+  else if(kind == TOKEN_cmp_leq) {return "<=";}
+  else if(kind == TOKEN_cmp_geq) {return ">=";}
+  else if(kind == TOKEN_left_arrow) {return "<-";}
+  else if(kind == 0) {return "EOF";}
+  return "{unknown token}";
+}
+
+static char const *get_token_string(t_token *token) {
+  t_token_kind kind = token->kind;
+  if(kind == TOKEN_idn) {
+    return token->str_value->str;
+  }
+  return get_token_kind_name(kind);
+}
+
+static void print_token(t_token *token) {
+  printf("%s", get_token_string(token));
+}
 
 // ABSTRACT SYNTAX TREES
 

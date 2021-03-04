@@ -207,60 +207,9 @@ static void lex_next_token(t_lexstate *state) {
   state->last_token.loc = state->loc;
 }
 
-
-
-static char const *get_token_kind_name(t_token_kind kind) {
-  if(kind == TOKEN_int) {return "INT";}
-  else if(kind == TOKEN_idn) {return "NAME";}
-  else if(kind == TOKEN_flt) {return "FLOAT";}
-  else if(kind == TOKEN_str) {return "STRING";}
-  else if(kind == '<') {return "<";}
-  else if(kind == '>') {return ">";}
-  else if(kind == '=') {return "=";}
-  else if(kind == '!') {return "!";}
-  else if(kind == '-') {return "-";}
-  else if(kind == '+') {return "+";}
-  else if(kind == '*') {return "*";}
-  else if(kind == '/') {return "/";}
-  else if(kind == '@') {return "@";}
-  else if(kind == '$') {return "$";}
-  else if(kind == '#') {return "#";}
-  else if(kind == '%') {return "%";}
-  else if(kind == '^') {return "^";}
-  else if(kind == '&') {return "&";}
-  else if(kind == '|') {return "|";}
-  else if(kind == ':') {return ":";}
-  else if(kind == ';') {return ";";}
-  else if(kind == ',') {return ",";}
-  else if(kind == '?') {return "?";}
-  else if(kind == '(') {return "(";}
-  else if(kind == ')') {return ")";}
-  else if(kind == '[') {return "[";}
-  else if(kind == ']') {return "]";}
-  else if(kind == '{') {return "{";}
-  else if(kind == '}') {return "}";}
-  else if(kind == TOKEN_cmp_neq) {return "!=";}
-  else if(kind == TOKEN_cmp_eq) {return "==";}
-  else if(kind == TOKEN_cmp_leq) {return "<=";}
-  else if(kind == TOKEN_cmp_geq) {return ">=";}
-  else if(kind == TOKEN_left_arrow) {return "<-";}
-  else if(kind == 0) {return "EOF";}
-  return "{unknown token}";
+static inline bool token_is_keyword(t_token *token) {
+  return (token->flags & FLAG_keyword) != 0;
 }
-
-static char const *get_token_string(t_token *token) {
-  t_token_kind kind = token->kind;
-  if(kind == TOKEN_idn) {
-    return token->str_value->str;
-  }
-  return get_token_kind_name(kind);
-}
-
-static void print_token(t_token *token) {
-  printf("%s", get_token_string(token));
-}
-
-
 
 static inline bool token_is_kind(t_lexstate *state, t_token_kind kind) {
   return state->last_token.kind == kind;
