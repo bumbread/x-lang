@@ -768,8 +768,13 @@ static t_ast_node *parse_stmt(t_lexstate *state) {
     return null;
   }
   else {
-    node = parse_assignment(state);
-    token_expect_kind(state, ';');
+    if(state->last_token.kind == TOKEN_eof) {
+      node = null;
+    }
+    else {
+      node = parse_assignment(state);
+      token_expect_kind(state, ';');
+    }
   }
   assert(node != null);
   return node;
@@ -783,6 +788,10 @@ static t_ast_node *parse_stmts(t_lexstate *state) {
   block->stmt.cat = STMT_block;
   while(true) {
     if(token_match_kind(state, '}')) {
+      break;
+    }
+    else if(state->last_token.kind == TOKEN_eof) {
+      unexpected_last_token(state);
       break;
     }
     else {

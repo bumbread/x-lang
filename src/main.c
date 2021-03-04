@@ -45,8 +45,9 @@ int main(void) {
   fseek(input, 0, SEEK_END);
   size_t input_size = ftell(input);
   fseek(input, 0, SEEK_SET);
-  buf = malloc(input_size);
+  buf = malloc(1+input_size);
   fread(buf, input_size, 1, input);
+  buf[input_size] = 0;
   
   t_lexstate state;
   lex_init(&state, filename, (char *)buf);
