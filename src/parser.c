@@ -530,7 +530,7 @@ static t_ast_node *parse_assignment(t_lexstate *state) {
       t_ast_node *node = alloc_node();
       node->cat = AST_expr_node;
       node->expr.cat = EXPR_binary_op;
-      node->expr.op = BINARY_div_ass;
+      node->expr.op = BINARY_ass;
       node->expr.opr1 = operand_left;
       node->expr.opr2 = operand_right;
       operand_left = node;
@@ -867,8 +867,8 @@ static char const *get_operator_string(t_operator_cat cat) {
     case BINARY_div: return "/";
     case BINARY_add_ass: return "+=";
     case BINARY_sub_ass: return "-=";
-    case BINARY_div_ass: return "*=";
-    case BINARY_mul_ass: return "/=";
+    case BINARY_div_ass: return "/=";
+    case BINARY_mul_ass: return "*=";
     case BINARY_and: return "and";
     case BINARY_or: return "or";
     case BINARY_less: return "<";
