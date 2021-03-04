@@ -1,6 +1,11 @@
 
 // TOKENS
 
+struct {
+  u64 line;
+  u64 offset;
+} typedef t_location;
+
 enum {
   TOKEN_eof = 0,   // end of file
   // All ascii characters are a separate token
@@ -33,13 +38,12 @@ struct {
   t_token_flags flags;
   char const *start;
   char const *end;
+  t_location loc;
   union {
     i64 int_value;
     f64 flt_value;
     t_intern const *str_value;
   };
-  u64 line;
-  u64 offset;
 } typedef t_token;
 
 // ABSTRACT SYNTAX TREES

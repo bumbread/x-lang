@@ -3,15 +3,14 @@ struct {
   char const *filename;
   char const *stream;
   t_token last_token;
-  u64 line;
-  u64 offset;
+  t_location loc;
 } typedef t_lexstate;
 
 static void lex_init(t_lexstate *state, char const *filename, char const *stream) {
   state->filename = filename;
   state->stream = stream;
-  state->line = 1;
-  state->offset = 1;
+  state->loc.line = 1;
+  state->loc.offset = 1;
   t_token eof_token; // to be removed later
   eof_token.start = eof_token.end = null;
   eof_token.kind = TOKEN_eof;
@@ -21,10 +20,10 @@ static void lex_init(t_lexstate *state, char const *filename, char const *stream
 static inline char const lex_next_char(t_lexstate *state) {
   char result = *state->stream;
   state->stream += 1;
-  state->offset += 1;
+  state->loc.offset += 1;
   if(result == '\n') {
-    state->line += 1;
-    state->offset = 0;
+    state->loc.line += 1;
+    state->loc.offset = 0;
   }
   return result;
 }
@@ -205,8 +204,7 @@ static void lex_next_token(t_lexstate *state) {
   char const *end = state->stream;
   state->last_token.start = start;
   state->last_token.end = end;
-  state->last_token.line = state->line;
-  state->last_token.offset = state->offset;
+  state->last_token.loc = state->loc;
 }
 
 
@@ -283,7 +281,7 @@ static inline bool token_expect_kind(t_lexstate *state, t_token_kind kind) {
   }
   push_errorf("%s(%d, %d): expected token %s, got %s",
               state->filename,
-              state->line, state->offset,
+              state->loc.line, state->loc.offset,
               get_token_kind_name(kind),
               get_token_string(&state->last_token));
   return false;

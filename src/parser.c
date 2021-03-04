@@ -65,15 +65,17 @@ static void parser_init_memory(void) {
 static inline bool unexpected_last_token(t_lexstate *state) {
   push_errorf("%s(%d, %d): unexpected token %s.",
               state->filename,
-              state->line, state->offset,
+              state->last_token.loc.line, state->last_token.loc.offset,
               get_token_string(&state->last_token));
   return false;
 }
 
 static inline void parse_error(t_lexstate *state, char const *string) {
+  // TODO(bumbread): make sure that last_token is the place where this
+  // error occurs when this function is called.
   push_errorf("%s(%d, %d): %s",
               state->filename,
-              state->line, state->offset,
+              state->last_token.loc.line, state->last_token.loc.offset,
               string);
 }
 
