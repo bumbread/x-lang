@@ -126,6 +126,20 @@ struct t_ast_list_link_ {
   t_ast_node *p;
 };
 
+struct t_ast_stack_link_ typedef t_ast_stack_link;
+
+struct {
+  t_ast_stack_link *first;
+  t_ast_stack_link *last;
+} typedef t_ast_stack_list;
+
+struct t_ast_stack_link_ {
+  t_ast_stack_link *next;
+  t_ast_stack_link *prev;
+  t_ast_node *p;
+};
+
+
 enum {
   TYPE_none,
   TYPE_alias,

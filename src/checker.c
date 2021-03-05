@@ -1,17 +1,4 @@
 
-struct t_ast_stack_list_link_ typedef t_ast_stack_list_link;
-
-struct {
-  t_ast_list_link *first;
-  t_ast_list_link *last;
-} typedef t_ast_stack_list;
-
-struct t_ast_stack_list_link_ {
-  t_ast_list_link *next;
-  t_ast_list_link *prev;
-  t_ast_node *p;
-};
-
 static t_ast_stack_list *alloc_stack_list(void) {
   t_ast_stack_list *result = global_alloc(sizeof(t_ast_stack_list));
   result->first = null;
@@ -19,14 +6,14 @@ static t_ast_stack_list *alloc_stack_list(void) {
   return result;
 }
 
-static t_ast_stack_list_link *alloc_stack_list_link(void) {
-  t_ast_stack_list_link *result = global_alloc(sizeof(t_ast_stack_list_link));
+static t_ast_stack_link *alloc_stack_link(void) {
+  t_ast_stack_link *result = global_alloc(sizeof(t_ast_stack_link));
   result->next = null;
   result->prev = null;
   return result;
 }
 
-static void stack_list_push(t_ast_stack_list *list, t_ast_stack_list_link *to_attach) {
+static void ast_stack_push(t_ast_stack_list *list, t_ast_stack_link *to_attach) {
   assert(to_attach != null);
   to_attach->next = null;
   to_attach->prev = list->last;
@@ -41,13 +28,13 @@ static void stack_list_push(t_ast_stack_list *list, t_ast_stack_list_link *to_at
 
 static void stack_list_push_node(t_ast_stack_list *list, t_ast_node *node) {
   assert(node != null);
-  t_ast_stack_list_link *link = alloc_stack_list_link();
+  t_ast_stack_link *link = alloc_stack_link();
   link->p = node;
-  stack_list_push(list, link);
+  ast_stack_push(list, link);
 }
 
 static void stack_list_push_frame(t_ast_stack_list *list) {
-  t_ast_stack_list_link *to_attach = alloc_stack_list_link();
+  t_ast_stack_link *to_attach = alloc_stack_link();
   to_attach->next = null;
   to_attach->prev = list->last;
   to_attach->p = null;
@@ -61,7 +48,7 @@ static void stack_list_push_frame(t_ast_stack_list *list) {
 }
 
 static void stack_list_pop_frame(t_ast_stack_list *list) {
-  t_ast_stack_list_link *search_node = list->last;
+  t_ast_stack_link *search_node = list->last;
   while(search_node->p != null) {
     search_node = search_node->prev;
     if(search_node == null) {
@@ -69,7 +56,7 @@ static void stack_list_pop_frame(t_ast_stack_list *list) {
       return;
     }
   }
-  t_ast_stack_list_link *new_last = search_node->prev;
+  t_ast_stack_link *new_last = search_node->prev;
   new_last->next = null;
   list->last = new_last;
 }
@@ -172,7 +159,7 @@ static void check_type_require_names(t_ast_node *node) {
 }
 
 static t_ast_node *get_var_name(t_intern const *var_name) {
-  for(t_ast_stack_list_link *decl = decls.last;
+  for(t_ast_stack_link *decl = decls.last;
       decl != null;
       decl = decl->prev) {
     if(decl->p == null) continue;
@@ -252,7 +239,7 @@ static void check_decl(t_ast_node *decl_node) {
   assert(decl_node->stmt.decl_name != null);
   assert(decl_node->stmt.decl_type != null);
   
-  for(t_ast_stack_list_link *prev_decl = decls.first;
+  for(t_ast_stack_link *prev_decl = decls.first;
       prev_decl != null;
       prev_decl = prev_decl->next) {
     if(prev_decl->p == null) continue;
