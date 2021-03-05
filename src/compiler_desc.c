@@ -1,4 +1,3 @@
-
 // TOKENS
 
 struct {
@@ -148,8 +147,13 @@ enum {
   TYPE_function,
 } typedef t_type_cat;
 
+enum {
+  FLAG_is_lvalue=1
+} typedef t_type_flags;
+
 struct t_type_node_ {
   t_type_cat cat;
+  t_type_flags flags;
   union {
     // aliases
     t_intern const *name;

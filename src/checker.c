@@ -65,19 +65,15 @@ static void stack_list_pop_frame(t_ast_stack_list *list) {
 t_ast_node *scope;
 t_ast_stack_list decls;
 
+// NOTE(bumbread): debug call.
 static void check_type(t_ast_node *node) {
   assert(node->cat == AST_type_node);
   if(node->type.cat == TYPE_alias) {
-    if(node->type.name == keyword_int) {
-    }
-    else if(node->type.name == keyword_byte) {
-    }
-    else if(node->type.name == keyword_bool) {
-    }
-    else if(node->type.name == keyword_float) {
-    }
-    else if(node->type.name == keyword_string) {
-    }
+    if(node->type.name == keyword_int) {}
+    else if(node->type.name == keyword_byte) {}
+    else if(node->type.name == keyword_bool) {}
+    else if(node->type.name == keyword_float) {}
+    else if(node->type.name == keyword_string) {}
     else {
       push_errorf("type %s not declared!", node->type.name);
     }
@@ -158,7 +154,7 @@ static void check_type_require_names(t_ast_node *node) {
   else assert(false);
 }
 
-static t_ast_node *get_var_name(t_intern const *var_name) {
+static t_ast_node *get_decl_by_name_noerr(t_intern const *var_name) {
   for(t_ast_stack_link *decl = decls.last;
       decl != null;
       decl = decl->prev) {
@@ -173,7 +169,31 @@ static t_ast_node *get_var_name(t_intern const *var_name) {
   return null;
 }
 
+
+static t_ast_node *get_decl_by_name(t_intern const *var_name) {
+  for(t_ast_stack_link *decl = decls.last;
+      decl != null;
+      decl = decl->prev) {
+    if(decl->p == null) continue;
+    t_ast_node *decl_node = decl->p;
+    assert(decl_node->cat == AST_stmt_node);
+    assert(decl_node->stmt.cat == STMT_declaration);
+    if(decl_node->stmt.decl_name == var_name) {
+      return decl_node->stmt.decl_type;
+    }
+  }
+  push_errorf("name %s was not declared!", var_name->str);
+  return null;
+}
+
 static t_ast_node *get_variable_type(t_intern const *var_name) {
+  t_ast_node *decl_node = get_decl_by_name(var_name);
+  if(decl_node != null) {
+    assert(decl_node->cat == AST_stmt_node);
+    assert(decl_node->stmt.decl_name == var_name);
+    assert(decl_node->stmt.decl_type != null);
+    return decl_node->stmt.decl_type;
+  }
   return null;
 }
 
@@ -184,11 +204,10 @@ static void check_derive_expression_type(t_ast_node *expression) {
       assert(expression->expr.type == null);
       assert(expression->expr.var_name != null);
       t_ast_node *type = get_variable_type(expression->expr.var_name);
-      if(type == null) {
-        push_errorf("variable %s is not declared!", expression->expr.var_name->str);
-      }
+      type->type.flags |= FLAG_is_lvalue;
       expression->expr.type = type;
     } break;
+    // TODO(bumbread): delayed type concretisation.
     case EXPR_int_value: {
       assert(expression->expr.type == type_int);
     } break;
@@ -198,8 +217,8 @@ static void check_derive_expression_type(t_ast_node *expression) {
     case EXPR_string_value: {
       assert(expression->expr.type == type_string);
     } break;
-    // TODO(bumbread): booleans??????
     case EXPR_unary_op: {
+      
       assert(op_is_unary(expression->expr.op));
       t_ast_node *opr = expression->expr.opr1;
       check_derive_expression_type(opr);
@@ -207,21 +226,214 @@ static void check_derive_expression_type(t_ast_node *expression) {
       assert(opr_type != null);
       
       switch(expression->expr.op) {
-        case UNARY_sub:
-        case UNARY_add: {
+        case UNARY_add:
+        case UNARY_sub: {
           assert(opr_type->cat == AST_type_node);
-          // TODO(bumbread): check the type.
-        }
-      } break;
+          if(!is_arithmetic_type(opr_type)) {
+            push_errorf("unary arithmetic is not supported for %s type", get_short_type_name(opr_type));
+          }
+          // assumption that unary arithmetic returns the type of the operand.
+          expression->expr.type = opr_type;
+        } break;
+        case UNARY_deref: {
+          assert(opr_type->cat == AST_type_node);
+          if(!is_reference_type(opr_type)) {
+            push_errorf("dereference is not supported for %s type", get_short_type_name(opr_type));
+          }
+          // assumption that only the pointer/slice types are dereferencable.
+          expression->expr.type = opr_type->type.base_type;
+        } break;
+        case UNARY_addr: {
+          assert(opr_type->cat == AST_type_node);
+          if((opr_type->type.flags & FLAG_is_lvalue) == 0) {
+            push_errorf("taking address of non-lvalue");
+          }
+          t_ast_node *type_node = alloc_node();
+          type_node->cat = AST_type_node;
+          type_node->type.cat = TYPE_pointer;
+          type_node->type.flags = 0;
+          type_node->type.base_type = opr_type;
+          expression->expr.type = type_node;
+        } break;
+      }
     } break;
-    case EXPR_binary_op: 
-    case EXPR_ternary_op:
+    case EXPR_binary_op:  {
+      
+      assert(op_is_binary(expression->expr.op));
+      t_ast_node *opr1 = expression->expr.opr1;
+      check_derive_expression_type(opr1);
+      t_ast_node *opr1_type = opr1->expr.type;
+      t_ast_node *opr2 = expression->expr.opr2;
+      t_ast_node *opr2_type;
+      
+      // NOTE(bumbread): in function calls the second "expression"
+      // is never an expression, but ast list consisting of expression.
+      // type checking the parameter list as an expression is stupid.
+      if(expression->expr.op != BINARY_function_call) {
+        check_derive_expression_type(opr2);
+        opr2_type = opr2->expr.type;
+      }
+      
+      switch(expression->expr.op) {
+        case BINARY_add:
+        case BINARY_sub:
+        case BINARY_mul:
+        case BINARY_div: {
+          assert(opr1_type->cat == AST_type_node);
+          assert(opr2_type->cat == AST_type_node);
+          if(!are_types_arithmetically_compatible(opr1_type, opr2_type)) {
+            push_errorf("unary arithmetic is not supported %s and %s types", 
+                        get_short_type_name(opr1_type), get_short_type_name(opr2_type));
+          }
+          // assumption that binary arithmetic returns the type of the operand.
+          // assumption that the requirement for binary arithmetic is that the types are equal.
+          expression->expr.type = opr1_type;
+        } break;
+        case BINARY_less:
+        case BINARY_greater:
+        case BINARY_leq:
+        case BINARY_geq: {
+          assert(opr1_type->cat == AST_type_node);
+          assert(opr2_type->cat == AST_type_node);
+          if(!are_types_relational(opr1_type, opr2_type)) {
+            push_errorf("can not compare %s type to %s type",
+                        get_short_type_name(opr1_type), get_short_type_name(opr2_type));
+          }
+          t_ast_node *type_node = alloc_node();
+          type_node->cat = AST_type_node;
+          type_node->type.cat = TYPE_alias;
+          type_node->type.flags = 0;
+          type_node->type.name = keyword_bool;
+          expression->expr.type = type_node;
+        } break;
+        case BINARY_eq:
+        case BINARY_neq: {
+          assert(opr1_type->cat == AST_type_node);
+          assert(opr2_type->cat == AST_type_node);
+          if(!are_types_comparable(opr1_type, opr2_type)) {
+            push_errorf("can not compare %s type to %s type",
+                        get_short_type_name(opr1_type), get_short_type_name(opr2_type));
+          }
+          t_ast_node *type_node = alloc_node();
+          type_node->cat = AST_type_node;
+          type_node->type.cat = TYPE_alias;
+          type_node->type.flags = 0;
+          type_node->type.name = keyword_bool;
+          expression->expr.type = type_node;
+        } break;
+        case BINARY_and:
+        case BINARY_or: {
+          assert(opr1_type->cat == AST_type_node);
+          assert(opr2_type->cat == AST_type_node);
+          if(!are_types_logical(opr1_type, opr2_type)) {
+            push_errorf("operation %s is not available for %s type and %s type",
+                        expression->expr.op == BINARY_and?"AND":"OR",
+                        get_short_type_name(opr1_type), get_short_type_name(opr2_type));
+          }
+          t_ast_node *type_node = alloc_node();
+          type_node->cat = AST_type_node;
+          type_node->type.cat = TYPE_alias;
+          type_node->type.flags = 0;
+          type_node->type.name = keyword_bool;
+          expression->expr.type = type_node;
+        }
+        case BINARY_function_call: {
+          assert(opr1_type->cat == AST_type_node);
+          if(!is_callable_type(opr1_type)) {
+            push_errorf("%s type is not callable", get_short_type_name(opr1_type));
+            break;
+          }
+          assert(opr1_type->type.parameters->cat == AST_list_node);
+          assert(opr2->cat == AST_list_node);
+          t_ast_list_link *formal_param = opr1_type->type.parameters->list.first;
+          t_ast_list_link *actual_param = opr2->list.first;
+          u64 param_no = 0;
+          for(; formal_param != null && actual_param != null;
+              formal_param = formal_param->next, actual_param = actual_param->next) {
+            param_no += 1;
+            
+            t_ast_node *formal_decl = formal_param->p;
+            assert(formal_decl->cat == AST_stmt_node);
+            assert(formal_decl->stmt.cat == STMT_declaration);
+            t_ast_node *formal_param_type = formal_decl->stmt.decl_type;
+            assert(formal_param_type != null);
+            
+            check_derive_expression_type(actual_param->p);
+            if(!can_assign_types(formal_param_type, actual_param->p)) {
+              // TODO(bumbread): long parameter names here.
+              push_errorf("at argument index %ull, actual %s parameter can not be assigned to formal %s parameter", 
+                          param_no, 
+                          get_short_type_name(formal_param_type),
+                          get_short_type_name(actual_param->p));
+            }
+          }
+          if(formal_param == null && actual_param != null) {
+            push_errorf("too many actual parameters");
+          }
+          else if(formal_param != null && actual_param == null) {
+            push_errorf("not enough actual parameters");
+          }
+          expression->expr.type = opr1_type->type.return_type;
+        } break;
+        case BINARY_subscript: {
+          assert(opr1_type->cat == AST_type_node);
+          assert(opr2_type->cat == AST_type_node);
+          if(!is_subscriptable_type(opr1_type)) {
+            push_errorf("can not subscript type %s", get_short_type_name(opr1_type));
+            break;
+          }
+          
+        } break;
+        case BINARY_ass:
+        case BINARY_add_ass:
+        case BINARY_sub_ass:
+        case BINARY_mul_ass:
+        case BINARY_div_ass:
+        default: 
+        assert(false);
+      }
+    } break;
+    case EXPR_ternary_op: {
+      assert(op_is_ternary(expression->expr.op));
+      
+      t_ast_node *opr1 = expression->expr.opr1;
+      check_derive_expression_type(opr1);
+      t_ast_node *opr1_type = opr1->expr.type;
+      
+      t_ast_node *opr2 = expression->expr.opr2;
+      if(opr2 != null) {
+        check_derive_expression_type(opr2);
+        t_ast_node *opr2_type = opr2->expr.type;
+        assert(opr2_type->cat == AST_type_node);
+      }
+      
+      t_ast_node *opr3 = expression->expr.opr3;
+      if(opr3 != null) {
+        check_derive_expression_type(opr3);
+        t_ast_node *opr3_type = opr3->expr.type;
+        assert(opr3_type->cat == AST_type_node);
+      }
+      
+      // the only ternary operator.
+      assert(expression->expr.op == TERNARY_slice);
+      assert(opr1_type->cat == AST_type_node);
+      
+      if(!is_sliceable_type(opr1_type)) {
+        push_errorf("%s type can not be sliced", get_short_type_name(opr1_type));
+        break;
+      }
+      if(opr1 != null) {
+        // TODO(bumbread): it can be a function returning an integer though.
+        if(opr1->type.cat != TYPE_alias || opr1->type.name != keyword_int) {
+          push_errorf("first slice index has to be a number");
+        }
+        if(opr2->type.cat != TYPE_alias || opr2->type.name != keyword_int) {
+          push_errorf("first slice index has to be a number");
+        }
+      }
+    }
     default: assert(false);
   }
-}
-
-static bool type_is_compatible(t_ast_node *lvalue, t_ast_node *rvalue) {
-  return false;
 }
 
 static void check_expression(t_ast_node *expression, t_type_node *type_node) {

@@ -15,6 +15,7 @@
 #include"compiler_desc.c"
 #include"lexer.c"
 #include"parser.c"
+#include"types.c"
 #include"checker.c"
 #include"test.c"
 
