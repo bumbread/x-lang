@@ -325,7 +325,9 @@ KEYWORD_param(keyword_bool,     "bool")\
 KEYWORD_param(keyword_byte,     "byte")\
 KEYWORD_param(keyword_int,      "int")\
 KEYWORD_param(keyword_float,    "float")\
-KEYWORD_param(keyword_string,   "string")
+KEYWORD_param(keyword_string,   "string")\
+KEYWORD_param(keyword_true,      "true")\
+KEYWORD_param(keyword_false,    "false")
 
 // array of all keywords for looping
 static t_intern const *keywords[] = {
@@ -357,7 +359,7 @@ static void init_compiler(void) {
     KEYWORD_spec
 #undef KEYWORD_param
     
-    keyword_string   = intern_cstring("main");
+    main_name = intern_cstring("main");
     
     type_int = alloc_node();
     type_bool = alloc_node();

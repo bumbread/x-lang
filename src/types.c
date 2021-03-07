@@ -149,11 +149,48 @@ static bool can_assign_types(t_ast_node *to, t_ast_node *from) {
 }
 
 static char const *get_short_type_name(t_ast_node *type) {
-    switch(type->cat) {
+    assert(type->cat == AST_type_node);
+    switch(type->type.cat) {
         case TYPE_alias: return type->type.name->str;
         case TYPE_pointer: return "pointer";
         case TYPE_slice: return "slice";
         case TYPE_function: return "function";
+        default: assert(false);
+    }
+    return "???";
+}
+
+static void print_type(t_ast_node *type) {
+    assert(type->cat == AST_type_node);
+    switch(type->type.cat) {
+        case TYPE_alias: {
+            printf("%s", type->type.name->str); 
+        } break;
+        case TYPE_pointer: {
+            printf("pointer to ");
+            print_type(type->type.base_type);
+        } break;
+        case TYPE_slice: {
+            printf("slice of ");
+            print_type(type->type.base_type);
+        } break;
+        case TYPE_function: {
+            printf("function taking (");
+            t_ast_node *params_list = type->type.parameters;
+            for(t_ast_list_link *param = params_list->list.first;
+                param != null;
+                param = param->next) {
+                t_ast_node *param_decl = param->p;
+                assert(param_decl->cat == AST_stmt_node);
+                assert(param_decl->stmt.cat == STMT_declaration);
+                print_type(param_decl->stmt.decl_type);
+                if(param->next != null) {
+                    printf(", ");
+                }
+            }
+            printf(") returning ");
+            print_type(type->type.return_type);
+        } break;
         default: assert(false);
     }
 }

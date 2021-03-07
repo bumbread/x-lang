@@ -1,7 +1,9 @@
 
-:int int;
 :int<-() main {
- if a {
-  $a = b[2:];
- }
+  print 3+2*2;
+  :bool a = false;
+  if {
+    return true;
+  }
+  return 0;
 }

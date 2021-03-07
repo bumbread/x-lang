@@ -1,4 +1,7 @@
 
+// TODO(bumbread): return values inside blocks inside functions
+//                 should typecheck.
+
 static t_ast_stack_list *alloc_stack_list(void) {
     t_ast_stack_list *result = global_alloc(sizeof(t_ast_stack_list));
     result->first = null;
@@ -57,7 +60,9 @@ static void stack_list_pop_frame(t_ast_stack_list *list) {
         }
     }
     t_ast_stack_link *new_last = search_node->prev;
-    new_last->next = null;
+    if(new_last != null) {
+        new_last->next = null;
+    }
     list->last = new_last;
 }
 
@@ -169,7 +174,6 @@ static t_ast_node *get_decl_by_name_noerr(t_intern const *var_name) {
     return null;
 }
 
-
 static t_ast_node *get_decl_by_name(t_intern const *var_name) {
     for(t_ast_stack_link *decl = decls.last;
         decl != null;
@@ -179,7 +183,7 @@ static t_ast_node *get_decl_by_name(t_intern const *var_name) {
         assert(decl_node->cat == AST_stmt_node);
         assert(decl_node->stmt.cat == STMT_declaration);
         if(decl_node->stmt.decl_name == var_name) {
-            return decl_node->stmt.decl_type;
+            return decl_node;
         }
     }
     push_errorf("name %s was not declared!", var_name->str);
@@ -187,9 +191,13 @@ static t_ast_node *get_decl_by_name(t_intern const *var_name) {
 }
 
 static t_ast_node *get_variable_type(t_intern const *var_name) {
+    if(var_name == keyword_true || var_name == keyword_false) {
+        return type_bool;
+    }
     t_ast_node *decl_node = get_decl_by_name(var_name);
     if(decl_node != null) {
         assert(decl_node->cat == AST_stmt_node);
+        assert(decl_node->stmt.cat == STMT_declaration);
         assert(decl_node->stmt.decl_name == var_name);
         assert(decl_node->stmt.decl_type != null);
         return decl_node->stmt.decl_type;
@@ -204,7 +212,12 @@ static void check_derive_expression_type(t_ast_node *expression) {
             assert(expression->expr.type == null);
             assert(expression->expr.var_name != null);
             t_ast_node *type = get_variable_type(expression->expr.var_name);
-            type->type.flags |= FLAG_is_lvalue;
+            if(type == null) {
+                //push_errorf("can not find variable named '%s'", expression->expr.var_name->str);
+            }
+            else {
+                type->type.flags |= FLAG_is_lvalue;
+            }
             expression->expr.type = type;
         } break;
         // TODO(bumbread): delayed type concretisation.
@@ -282,7 +295,7 @@ static void check_derive_expression_type(t_ast_node *expression) {
                     assert(opr1_type->cat == AST_type_node);
                     assert(opr2_type->cat == AST_type_node);
                     if(!are_types_arithmetically_compatible(opr1_type, opr2_type)) {
-                        push_errorf("unary arithmetic is not supported %s and %s types", 
+                        push_errorf("binary arithmetic is not supported between %s and %s types", 
                                     get_short_type_name(opr1_type), get_short_type_name(opr2_type));
                     }
                     // assumption that binary arithmetic returns the type of the operand.
@@ -454,7 +467,7 @@ static void check_decl(t_ast_node *decl_node);
 
 static void check_function_stmt(t_ast_node *node) {
     assert(node->cat == AST_stmt_node);
-    switch(node->cat) {
+    switch(node->stmt.cat) {
         case STMT_assignment: {
             assert(op_is_assignment(node->stmt.ass_op));
             check_derive_expression_type(node->stmt.rvalue);
@@ -472,15 +485,20 @@ static void check_function_stmt(t_ast_node *node) {
         } break;
         case STMT_if: {
             assert(node->stmt.if_condition != null);
-            check_derive_expression_type(node->stmt.if_condition);
             assert(node->stmt.if_condition->cat == AST_expr_node);
-            if(!is_logical_type(node->stmt.if_condition->expr.type)) {
-                push_errorf("the condition in 'if' statement must be a boolean expression. Met %s type",
-                            get_short_type_name(node->stmt.if_condition->expr.type));
+            check_derive_expression_type(node->stmt.if_condition);
+            t_ast_node *if_cond = node->stmt.if_condition;
+            if(if_cond->expr.type != null) {
+                if(!is_logical_type(if_cond->expr.type)) {
+                    push_errorf("the condition in 'if' statement must be a boolean expression. Met %s type",
+                                get_short_type_name(if_cond->expr.type));
+                }
             }
             // TODO check return value inside if.
             check_function_stmt(node->stmt.if_true_block);
-            check_function_stmt(node->stmt.if_false_block);
+            if(node->stmt.if_false_block != null) {
+                check_function_stmt(node->stmt.if_false_block);
+            }
         } break;
         case STMT_while: {
             assert(node->stmt.while_condition != null);
@@ -506,9 +524,8 @@ static void check_function_stmt(t_ast_node *node) {
         } break;
         case STMT_block: {
             stack_list_push_frame(&decls);
-            assert(block->cat == AST_stmt_node);
-            assert(block->stmt.cat == STMT_block);
-            for(t_ast_list_link *stmt = block->stmt.statements.first;
+            assert(node->stmt.cat == STMT_block);
+            for(t_ast_list_link *stmt = node->stmt.statements.first;
                 stmt != null;
                 stmt = stmt->next) {
                 t_ast_node *function_statement = stmt->p;
@@ -529,11 +546,6 @@ static void check_function_stmts(t_ast_node *block, t_ast_node *type) {
     assert(block->stmt.cat == STMT_block);
     assert(type->cat == AST_type_node);
     
-    if(type->type.cat != TYPE_function) {
-        push_errorf("only function declaration can have block initializers ('{...}')");
-        return;
-    }
-    
     bool return_stmt_found = false;
     for(t_ast_list_link *stmt = block->stmt.statements.first;
         stmt != null;
@@ -545,9 +557,9 @@ static void check_function_stmts(t_ast_node *block, t_ast_node *type) {
         if(function_statement->stmt.cat == STMT_return) {
             t_ast_node *return_value = function_statement->stmt.stmt_value;
             assert(return_value != null);
-            if(!can_assign_types(type, return_value->expr.type)) {
-                push_errorf("return value %s type is incompatible with function return %s type",
-                            get_short_type_name(return_value->expr.type), get_short_type_name(type));
+            if(!can_assign_types(type->type.return_type, return_value->expr.type)) {
+                push_errorf("return value of %s type is incompatible with function return of %s type",
+                            get_short_type_name(return_value->expr.type), get_short_type_name(type->type.return_type));
             }
             return_stmt_found = true;
         }
@@ -582,7 +594,31 @@ static void check_decl(t_ast_node *decl_node) {
             check_expression(decl_value, decl_node->stmt.decl_type);
         }
         else if(decl_value->cat == AST_stmt_node) {
-            check_function_stmts(decl_value, decl_node->stmt.decl_type);
+            t_ast_node *function_type = decl_node->stmt.decl_type;
+            if(function_type->type.cat != TYPE_function) {
+                push_errorf("only function declaration can have block initializers ('{...}')");
+                return;
+            }
+            stack_list_push_frame(&decls);
+            
+            assert(function_type->type.parameters->cat == AST_list_node);
+            for(t_ast_list_link *p_function_param = function_type->type.parameters->list.first;
+                p_function_param != null;
+                p_function_param = p_function_param->next) {
+                t_ast_node *function_param = p_function_param->p;
+                assert(function_param != null);
+                assert(function_param->cat == AST_stmt_node);
+                assert(function_param->stmt.cat == STMT_declaration);
+                if(function_param->stmt.decl_name == null) {
+                    push_errorf("function parameters are required to be named.");
+                }
+                else {
+                    stack_list_push_node(&decls, function_param);
+                }
+            }
+            
+            check_function_stmts(decl_value, function_type);
+            stack_list_pop_frame(&decls);
         }
     }
     else {
@@ -608,6 +644,7 @@ static void check_code(t_ast_node *root) {
         t_ast_node *decl_node = decl->p;
         assert(decl_node != null);
         check_decl(decl_node);
+        
         if(decl_node->stmt.decl_name == main_name) {
             main_found = true;
         }
@@ -615,6 +652,6 @@ static void check_code(t_ast_node *root) {
     
     // TODO(bumbread): libraries don't require main function.
     if(!main_found) {
-        push_errorf("error: main function not found~!");
+        push_errorf("error: main function not found!");
     }
 }
