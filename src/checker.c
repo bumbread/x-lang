@@ -1,7 +1,4 @@
 
-// TODO(bumbread): return values inside blocks inside functions
-//                 should typecheck.
-
 static t_ast_stack_list *alloc_stack_list(void) {
     t_ast_stack_list *result = global_alloc(sizeof(t_ast_stack_list));
     result->first = null;
@@ -470,7 +467,7 @@ static bool check_type_compat(t_ast_node *expression, t_ast_node *type_node) {
 
 static void check_decl(t_ast_node *decl_node);
 
-static void check_function_stmt(t_ast_node *node) {
+static void check_function_stmt(t_ast_node *node, t_ast_node *function_return_type) {
     assert(node->cat == AST_stmt_node);
     switch(node->stmt.cat) {
         case STMT_assignment: {
@@ -500,10 +497,9 @@ static void check_function_stmt(t_ast_node *node) {
                                 get_short_type_name(if_cond->expr.type));
                 }
             }
-            // TODO check return value inside if.
-            check_function_stmt(node->stmt.if_true_block);
+            check_function_stmt(node->stmt.if_true_block, function_return_type);
             if(node->stmt.if_false_block != null) {
-                check_function_stmt(node->stmt.if_false_block);
+                check_function_stmt(node->stmt.if_false_block, function_return_type);
             }
         } break;
         case STMT_while: {
@@ -513,13 +509,12 @@ static void check_function_stmt(t_ast_node *node) {
                 push_errorf("the condition in 'while' statement must be a boolean expression. Met %s type",
                             get_short_type_name(node->stmt.if_condition->expr.type));
             }
-            // TODO return value inside while block
-            check_function_stmt(node->stmt.while_block);
+            check_function_stmt(node->stmt.while_block, function_return_type);
         } break;
         case STMT_return: {
-            // TODO(bumbread): return value match function return type.
             if(node->stmt.stmt_value != null) {
                 check_derive_expression_type(node->stmt.stmt_value);
+                check_type_compat(node->stmt.stmt_value, function_return_type);
             }
         } break;
         case STMT_break: {
@@ -531,7 +526,6 @@ static void check_function_stmt(t_ast_node *node) {
             check_decl(node);
         } break;
         case STMT_block: {
-            // TODO(bumbread): the return value inside the block
             stack_list_push_frame(&decls);
             assert(node->stmt.cat == STMT_block);
             for(t_ast_list_link *stmt = node->stmt.statements.first;
@@ -539,7 +533,7 @@ static void check_function_stmt(t_ast_node *node) {
                 stmt = stmt->next) {
                 t_ast_node *function_statement = stmt->p;
                 assert(function_statement->cat == AST_stmt_node);
-                check_function_stmt(function_statement);
+                check_function_stmt(function_statement, function_return_type);
             }
             stack_list_pop_frame(&decls);
         } break;
@@ -555,13 +549,12 @@ static void check_function_stmts(t_ast_node *block, t_ast_node *type) {
     assert(block->stmt.cat == STMT_block);
     assert(type->cat == AST_type_node);
     
-    bool return_stmt_found = false;
     for(t_ast_list_link *stmt = block->stmt.statements.first;
         stmt != null;
         stmt = stmt->next) {
         t_ast_node *function_statement = stmt->p;
         assert(function_statement->cat == AST_stmt_node);
-        check_function_stmt(function_statement);
+        check_function_stmt(function_statement, type->type.return_type);
         
         if(function_statement->stmt.cat == STMT_return) {
             t_ast_node *return_value = function_statement->stmt.stmt_value;
@@ -571,11 +564,7 @@ static void check_function_stmts(t_ast_node *block, t_ast_node *type) {
                                 get_short_type_name(return_value->expr.type), get_short_type_name(type->type.return_type));
                 }
             }
-            return_stmt_found = true;
         }
-    }
-    if(!return_stmt_found) {
-        push_errorf("return statement of function not found");
     }
 }
 
@@ -617,6 +606,7 @@ static void check_decl(t_ast_node *decl_node) {
         }
         else if(decl_value->cat == AST_stmt_node) {
             t_ast_node *function_type = decl_node->stmt.decl_type;
+            
             if(function_type->type.cat != TYPE_function) {
                 push_errorf("only function declaration can have block initializers ('{...}')");
                 return;

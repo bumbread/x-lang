@@ -148,7 +148,7 @@ enum {
 } typedef t_type_cat;
 
 enum {
-    FLAG_is_lvalue=1
+    FLAG_is_lvalue=1,
 } typedef t_type_flags;
 
 struct t_type_node_ {

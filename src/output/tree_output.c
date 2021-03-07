@@ -87,6 +87,8 @@ static void ast_node_print_tree(t_ast_node *node, bool is_newline) {
                         }
                     }
                     if(node->stmt.if_false_block != null) {
+                        printf("\n");
+                        print_level(level-1);
                         printf("else:");
                         t_ast_node *block = node->stmt.if_false_block;
                         assert(block->cat = AST_stmt_node);
@@ -151,14 +153,14 @@ static void ast_node_print_tree(t_ast_node *node, bool is_newline) {
                 case STMT_declaration: {
                     printf("decl ");
                     if(node->stmt.decl_name != null) {
-                        printf(" %s :", node->stmt.decl_name->str);
+                        printf("%s :", node->stmt.decl_name->str);
                     }
                     ast_node_print_tree(node->stmt.decl_type, false);
                     if(null != node->stmt.decl_value) {
                         printf(" = ");
                         ast_node_print_tree(node->stmt.decl_value, false);
                     }
-                    printf(";");
+                    //printf(";");
                 } break;
                 default: assert(false);
             }

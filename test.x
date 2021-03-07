@@ -1,5 +1,9 @@
 
 :int<-() main {
-  result = -1;
-  return;
+  if false {
+    return 4;
+  }
+  else {
+    return 2;
+  }
 }
