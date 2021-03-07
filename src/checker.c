@@ -451,16 +451,21 @@ static void check_derive_expression_type(t_ast_node *expression) {
     }
 }
 
-static void check_expression(t_ast_node *expression, t_ast_node *type_node) {
+// returns false if you shouldn't assume that the type was derived.
+static bool check_type_compat(t_ast_node *expression, t_ast_node *type_node) {
     assert(expression->cat == AST_expr_node);
     assert(type_node->cat == AST_type_node);
     if(expression->expr.type == null) {
         check_derive_expression_type(expression);
     }
-    if(!can_assign_types(type_node, expression->expr.type)) {
-        push_errorf("can not assign %s type to argument of type %s",
-                    get_short_type_name(type_node), get_short_type_name(expression->expr.type));
+    if(expression->expr.type != null) {
+        if(!can_assign_types(type_node, expression->expr.type)) {
+            push_errorf("can not assign %s type to argument of type %s",
+                        get_short_type_name(type_node), get_short_type_name(expression->expr.type));
+        }
+        return true;
     }
+    return false;
 }
 
 static void check_decl(t_ast_node *decl_node);
@@ -472,14 +477,15 @@ static void check_function_stmt(t_ast_node *node) {
             assert(op_is_assignment(node->stmt.ass_op));
             check_derive_expression_type(node->stmt.rvalue);
             check_derive_expression_type(node->stmt.lvalue);
-            check_expression(node->stmt.lvalue, node->stmt.rvalue->expr.type);
-            if(op_is_arithmetic_assignment(node->stmt.ass_op)) {
-                if(!are_types_arithmetically_compatible(node->stmt.rvalue->expr.type, 
-                                                        node->stmt.lvalue->expr.type)) {
-                    push_errorf("can not perform arithmetic operation %s on %s type and %s type.",
-                                get_operator_string(node->stmt.ass_op),
-                                get_short_type_name(node->stmt.rvalue->expr.type),
-                                get_short_type_name(node->stmt.lvalue->expr.type));
+            if(check_type_compat(node->stmt.lvalue, node->stmt.rvalue->expr.type)) {
+                if(op_is_arithmetic_assignment(node->stmt.ass_op)) {
+                    if(!are_types_arithmetically_compatible(node->stmt.rvalue->expr.type, 
+                                                            node->stmt.lvalue->expr.type)) {
+                        push_errorf("can not perform arithmetic operation %s on %s type and %s type.",
+                                    get_operator_string(node->stmt.ass_op),
+                                    get_short_type_name(node->stmt.rvalue->expr.type),
+                                    get_short_type_name(node->stmt.lvalue->expr.type));
+                    }
                 }
             }
         } break;
@@ -511,8 +517,10 @@ static void check_function_stmt(t_ast_node *node) {
             check_function_stmt(node->stmt.while_block);
         } break;
         case STMT_return: {
-            assert(node->stmt.stmt_value != null);
-            check_derive_expression_type(node->stmt.stmt_value);
+            // TODO(bumbread): return value match function return type.
+            if(node->stmt.stmt_value != null) {
+                check_derive_expression_type(node->stmt.stmt_value);
+            }
         } break;
         case STMT_break: {
             assert(node->stmt.stmt_value != null);
@@ -523,6 +531,7 @@ static void check_function_stmt(t_ast_node *node) {
             check_decl(node);
         } break;
         case STMT_block: {
+            // TODO(bumbread): the return value inside the block
             stack_list_push_frame(&decls);
             assert(node->stmt.cat == STMT_block);
             for(t_ast_list_link *stmt = node->stmt.statements.first;
@@ -556,10 +565,11 @@ static void check_function_stmts(t_ast_node *block, t_ast_node *type) {
         
         if(function_statement->stmt.cat == STMT_return) {
             t_ast_node *return_value = function_statement->stmt.stmt_value;
-            assert(return_value != null);
-            if(!can_assign_types(type->type.return_type, return_value->expr.type)) {
-                push_errorf("return value of %s type is incompatible with function return of %s type",
-                            get_short_type_name(return_value->expr.type), get_short_type_name(type->type.return_type));
+            if(return_value != null) {
+                if(!can_assign_types(type->type.return_type, return_value->expr.type)) {
+                    push_errorf("return value of %s type is incompatible with function return of %s type",
+                                get_short_type_name(return_value->expr.type), get_short_type_name(type->type.return_type));
+                }
             }
             return_stmt_found = true;
         }
@@ -567,6 +577,18 @@ static void check_function_stmts(t_ast_node *block, t_ast_node *type) {
     if(!return_stmt_found) {
         push_errorf("return statement of function not found");
     }
+}
+
+static t_ast_node *create_result_decl_of_type(t_ast_node *type) {
+    assert(type->cat == AST_type_node);
+    
+    t_ast_node *decl_node = alloc_node();
+    decl_node->cat = AST_stmt_node;
+    decl_node->stmt.cat = STMT_declaration;
+    decl_node->stmt.decl_name = result_name;
+    decl_node->stmt.decl_type = type;
+    decl_node->stmt.decl_value = get_default_value_for_type(type);
+    return decl_node;
 }
 
 static void check_decl(t_ast_node *decl_node) {
@@ -591,7 +613,7 @@ static void check_decl(t_ast_node *decl_node) {
         check_type_require_names(decl_node->stmt.decl_type);
         t_ast_node *decl_value = decl_node->stmt.decl_value;
         if(decl_value->cat == AST_expr_node) {
-            check_expression(decl_value, decl_node->stmt.decl_type);
+            check_type_compat(decl_value, decl_node->stmt.decl_type);
         }
         else if(decl_value->cat == AST_stmt_node) {
             t_ast_node *function_type = decl_node->stmt.decl_type;
@@ -600,6 +622,9 @@ static void check_decl(t_ast_node *decl_node) {
                 return;
             }
             stack_list_push_frame(&decls);
+            
+            t_ast_node *result_decl = create_result_decl_of_type(function_type->type.return_type);
+            stack_list_push_node(&decls, result_decl);
             
             assert(function_type->type.parameters->cat == AST_list_node);
             for(t_ast_list_link *p_function_param = function_type->type.parameters->list.first;

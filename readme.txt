@@ -70,6 +70,26 @@ Although you _have_ to encapsulate the operators of the block inside curly brace
 
 While loops support flow control operators such as break and continue.
 
+FUNCTIONS
+
+The lagnuage only has functions. Every function has a return value. If you want to create a procedure, create a function with int return type instead.
+  :int<-() func {
+     return;
+  }
+
+Inside functions a special implicit value "result" is initialized. By default it is zeroed for primitives and no action is done on complex types. In order to exit from function with return value, set the result value followed by the return statement:
+  :int<-() main {
+    result = -1;
+    return;
+  }
+
+It is possible to write the same thing by putting a value into return statement:
+  :int<-() main {
+    return -1;
+  }
+
+This statement will set result variable's value and return it.
+
 Source code conventions (mostly for me, not enforced):
 1.  all identifiers are written in snake_case.
 2.  except some macros and enum types, they can be in CAPS_SNAKE but also snake_case.

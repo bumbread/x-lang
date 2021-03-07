@@ -297,6 +297,7 @@ static t_ast_list all_procs;
 static t_ast_node *parser_scope = null;
 
 static t_intern const *main_name;
+static t_intern const *result_name;
 
 static t_ast_node *type_float;
 static t_ast_node *type_string;
@@ -360,6 +361,7 @@ static void init_compiler(void) {
 #undef KEYWORD_param
     
     main_name = intern_cstring("main");
+    result_name = intern_cstring("result");
     
     type_int = alloc_node();
     type_bool = alloc_node();

@@ -55,8 +55,10 @@ int main(void) {
     lex_next_token(&state);
     t_ast_node *code = parse_global_scope(&state);
     print_error_buffer();
-    check_code(code);
-    print_error_buffer();
+    if(now_errors == 0) {
+        check_code(code);
+        print_error_buffer();
+    }
     
     ast_node_print_tree(code, 0);
     printf("\n\n");

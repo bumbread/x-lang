@@ -1,4 +1,60 @@
 
+static t_ast_node *get_default_value_for_type(t_ast_node *type) {
+    assert(type->cat == AST_type_node);
+    switch(type->type.cat) {
+        case TYPE_alias: {
+            if(type->type.name == keyword_int) {
+                t_ast_node *result = alloc_node();
+                result->cat = AST_expr_node;
+                result->expr.cat = EXPR_int_value;
+                result->expr.ivalue = 0;
+                return result;
+            }
+            if(type->type.name == keyword_string) {
+                t_ast_node *result = alloc_node();
+                result->cat = AST_expr_node;
+                result->expr.cat = EXPR_string_value;
+                result->expr.svalue = 0;
+                return result;
+            }
+            if(type->type.name == keyword_bool) {
+                t_ast_node *result = alloc_node();
+                result->cat = AST_expr_node;
+                result->expr.cat = EXPR_int_value;
+                result->expr.ivalue = 0;
+                return result;
+            }
+            if(type->type.name == keyword_byte) {
+                t_ast_node *result = alloc_node();
+                result->cat = AST_expr_node;
+                result->expr.cat = EXPR_int_value;
+                result->expr.ivalue = 0;
+                return result;
+            }
+            if(type->type.name == keyword_float) {
+                t_ast_node *result = alloc_node();
+                result->cat = AST_expr_node;
+                result->expr.cat = EXPR_float_value;
+                result->expr.fvalue = 0;
+                return result;
+            }
+        } break;
+        case TYPE_pointer: {
+            t_ast_node *result = alloc_node();
+            result->cat = AST_expr_node;
+            result->expr.cat = EXPR_int_value;
+            result->expr.ivalue = 0;
+            return result;
+        } break;
+        case TYPE_slice:
+        case TYPE_function: {
+            return null;
+        } break;
+        default: assert(false);
+    }
+    return false;
+}
+
 static bool is_reference_type(t_ast_node *type_node) {
     assert(type_node->cat == AST_type_node);
     return type_node->type.cat == TYPE_pointer;
