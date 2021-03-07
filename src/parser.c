@@ -616,6 +616,9 @@ static t_ast_node *parse_type(t_lexstate *state) {
                 node_list_push(&decls->list, param_link);
                 
                 if(!token_match_kind(state, ';')) {
+                    if(!token_is_kind(state, ')')) {
+                        parse_error("expected either ; or )", state->loc);
+                    }
                     break;
                 }
             }

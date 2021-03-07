@@ -139,6 +139,8 @@ static void check_type_require_names(t_ast_node *node) {
         check_type(node->type.return_type);
         t_ast_node *parameters = node->type.parameters;
         assert(parameters->cat == AST_list_node);
+        
+        i64 param_count = 0;
         for(t_ast_list_link *param = parameters->list.first;
             param != null;
             param = param->next) {
@@ -149,8 +151,9 @@ static void check_type_require_names(t_ast_node *node) {
             assert(param_node->stmt.decl_value == null);
             check_type(param_node->stmt.decl_type);
             if(param_node->stmt.decl_name == null) {
-                push_errorf("function parameter is required to be named!");
+                push_errorf("function parameter (#%lld) is required to be named!", 1+param_count);
             }
+            param_count += 1;
         }
     }
     else assert(false);
@@ -369,7 +372,10 @@ static void check_derive_expression_type(t_ast_node *expression) {
                         assert(formal_param_type != null);
                         
                         check_derive_expression_type(actual_param->p);
-                        if(!can_assign_types(formal_param_type, actual_param->p)) {
+                        t_ast_node *actual_param_type = actual_param->p->expr.type;
+                        assert(actual_param_type != null);
+                        assert(actual_param_type->cat == AST_type_node);
+                        if(!can_assign_types(formal_param_type, actual_param_type)) {
                             // TODO(bumbread): long parameter names here.
                             push_errorf("at argument index %ull, actual %s parameter can not be assigned to formal %s parameter", 
                                         param_no, 
@@ -457,7 +463,7 @@ static bool check_type_compat(t_ast_node *expression, t_ast_node *type_node) {
     }
     if(expression->expr.type != null) {
         if(!can_assign_types(type_node, expression->expr.type)) {
-            push_errorf("can not assign %s type to argument of type %s",
+            push_errorf("can not assign %s type to variable of type %s",
                         get_short_type_name(type_node), get_short_type_name(expression->expr.type));
         }
         return true;
@@ -598,6 +604,8 @@ static void check_decl(t_ast_node *decl_node) {
         }
     }
     
+    stack_list_push_node(&decls, decl_node);
+    
     if(decl_node->stmt.decl_value != null) {
         check_type_require_names(decl_node->stmt.decl_type);
         t_ast_node *decl_value = decl_node->stmt.decl_value;
@@ -617,6 +625,7 @@ static void check_decl(t_ast_node *decl_node) {
             stack_list_push_node(&decls, result_decl);
             
             assert(function_type->type.parameters->cat == AST_list_node);
+            // TODO(bumbread): remove code duplication by checking for name decls here.
             for(t_ast_list_link *p_function_param = function_type->type.parameters->list.first;
                 p_function_param != null;
                 p_function_param = p_function_param->next) {
@@ -624,10 +633,7 @@ static void check_decl(t_ast_node *decl_node) {
                 assert(function_param != null);
                 assert(function_param->cat == AST_stmt_node);
                 assert(function_param->stmt.cat == STMT_declaration);
-                if(function_param->stmt.decl_name == null) {
-                    push_errorf("function parameters are required to be named.");
-                }
-                else {
+                if(function_param->stmt.decl_name != null) {
                     stack_list_push_node(&decls, function_param);
                 }
             }
@@ -639,8 +645,6 @@ static void check_decl(t_ast_node *decl_node) {
     else {
         check_type(decl_node->stmt.decl_type);
     }
-    
-    stack_list_push_node(&decls, decl_node);
 }
 
 static void check_code(t_ast_node *root) {

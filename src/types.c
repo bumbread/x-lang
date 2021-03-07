@@ -188,7 +188,13 @@ static bool can_assign_types(t_ast_node *to, t_ast_node *from) {
                     for(link1 = params1->list.first, link2 = params2->list.first;
                         link1 != null && link2 != null;
                         link1 = link1->next, link2 = link2->next) {
-                        if(!can_assign_types(link1->p, link2->p)) {
+                        t_ast_node *param1_decl = link1->p;
+                        t_ast_node *param2_decl = link2->p;
+                        assert(param1_decl->cat == AST_stmt_node);
+                        assert(param2_decl->cat == AST_stmt_node);
+                        assert(param1_decl->stmt.cat == STMT_declaration);
+                        assert(param2_decl->stmt.cat == STMT_declaration);
+                        if(!can_assign_types(param1_decl->stmt.decl_type, param2_decl->stmt.decl_type)) {
                             return false;
                         }
                     }

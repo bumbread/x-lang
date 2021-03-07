@@ -31,11 +31,30 @@ static void ast_node_print_tree(t_ast_node *node, bool is_newline) {
             }
             else if(node->expr.cat == EXPR_binary_op) {
                 assert(op_is_binary(node->expr.op));
-                printf("(");
-                ast_node_print_tree(node->expr.opr1, false);
-                printf(" %s ", get_operator_string(node->expr.op));
-                ast_node_print_tree(node->expr.opr2, false);
-                printf(")");
+                if(node->expr.op != BINARY_function_call) {
+                    printf("(");
+                    ast_node_print_tree(node->expr.opr1, false);
+                    printf(" %s ", get_operator_string(node->expr.op));
+                    ast_node_print_tree(node->expr.opr2, false);
+                    printf(")");
+                }
+                else {
+                    printf("(call ");
+                    ast_node_print_tree(node->expr.opr1, false);
+                    t_ast_node *param_list = node->expr.opr2;
+                    assert(param_list->cat == AST_list_node);
+                    printf("(");
+                    for(t_ast_list_link *param_link = param_list->list.first;
+                        param_link != null;
+                        param_link = param_link->next) {
+                        ast_node_print_tree(param_link->p, false);
+                        if(param_link->next != null) {
+                            printf(", ");
+                        }
+                    }
+                    printf(")");
+                    printf(")");
+                }
             }
             else if(node->expr.cat == EXPR_ternary_op) {
                 assert(op_is_ternary(node->expr.op));

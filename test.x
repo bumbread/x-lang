@@ -1,7 +1,7 @@
 
-:int<-() main {
+:int<-(int a)<-(int b) main {
   if false {
-    return 4;
+    return main(2);
   }
   else {
     return 2;
