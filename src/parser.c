@@ -28,19 +28,22 @@ static t_expr_data *parse_expr_value(t_lexstate *state) {
     }
     else if(state->last_token.kind == TOKEN_str) {
         node = make_static_value();
-        node->cat = VALUE_string;
+        node->cat = EXPR_value;
+        node->value.cat = VALUE_string;
         node->value.s = state->last_token.str_value;
         lex_next_token(state);
     }
     else if(state->last_token.kind == TOKEN_int) {
         node = make_static_value();
-        node->cat = VALUE_int;
+        node->cat = EXPR_value;
+        node->value.cat = VALUE_int;
         node->value.i = state->last_token.int_value;
         lex_next_token(state);
     }
     else if(state->last_token.kind == TOKEN_flt) {
         node = make_static_value();
-        node->cat = VALUE_float;
+        node->cat = EXPR_value;
+        node->value.cat = VALUE_float;
         node->value.f = state->last_token.flt_value;
         lex_next_token(state);
     }

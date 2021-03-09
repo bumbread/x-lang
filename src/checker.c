@@ -44,7 +44,7 @@ static t_decl_data *get_decl_by_name_noerr(t_intern const *var_name) {
         if(decl_node->data == null) continue;
         t_decl_data *decl = decl_node->data;
         
-        assert(decl->name != var_name);
+        assert(decl->name != null);
         assert(decl->type != null);
         if(decl->name == var_name) {
             return decl;
@@ -60,7 +60,7 @@ static t_decl_data *get_decl_by_name(t_intern const *var_name) {
         if(decl_node->data == null) continue;
         t_decl_data *decl = decl_node->data;
         
-        assert(decl->name != var_name);
+        assert(decl->name != null);
         assert(decl->type != null);
         if(decl->name == var_name) {
             return decl;
