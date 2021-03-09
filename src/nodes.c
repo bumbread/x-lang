@@ -311,7 +311,7 @@ static t_stmt_data *make_return_stmt(t_expr_data *expr) {
 
 static t_stmt_data *make_print_stmt(t_expr_data *expr) {
     t_stmt_data *result = make_stmt();
-    result->cat = STMT_return;
+    result->cat = STMT_print;
     result->print_expr = expr;
     return result;
 }
