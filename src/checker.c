@@ -301,6 +301,7 @@ static void check_derive_expression_type(t_expr_data *expr) {
 
 // returns false if you shouldn't assume that the type was derived.
 static bool check_type_compat(t_expr_data *expr, t_type_data *type) {
+    assert(expr != null);
     if(expr->type == null) check_derive_expression_type(expr);
     if(expr->type != null) {
         if(!can_assign_type_to_another(type, expr->type)) {
@@ -315,6 +316,9 @@ static bool check_type_compat(t_expr_data *expr, t_type_data *type) {
 static void check_decl(t_decl_data *decl_node);
 
 static void check_function_stmt(t_stmt_data *stmt, t_type_data *function_return_type) {
+    assert(stmt != null);
+    assert(function_return_type != null);
+    
     switch(stmt->cat) {
         case STMT_expr: {
             check_derive_expression_type(stmt->expr);

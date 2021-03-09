@@ -24,7 +24,6 @@
 
 int main(void) {
     
-#if 0
     init_error_buffer(20);
     string_builder_init();
     
@@ -61,8 +60,9 @@ int main(void) {
         print_error_buffer();
     }
     
+    print_decl_list(code);
     //ast_node_print_tree(code, 0);
-    
+#if 0
     t_ast_node *code = parse_ast_node_global_level(":int");
     printf("\n\noutput tree:\n\n");
     ast_node_print_tree(code, 0);
