@@ -371,8 +371,8 @@ static void check_function_stmt(t_stmt_data *stmt, t_type_data *function_return_
     }
 }
 
-static void check_function_stmts(t_stmt_data *block, t_type_data *type) {
-    for(t_stmt_list_node *stmt_node = block->block_data.first;
+static void check_function_stmts(t_stmt_list *block, t_type_data *type) {
+    for(t_stmt_list_node *stmt_node = block->first;
         stmt_node != null;
         stmt_node = stmt_node->next) {
         t_stmt_data *stmt = stmt_node->data;
