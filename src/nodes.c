@@ -341,7 +341,7 @@ static t_decl_data *make_decl_no_value(t_intern const *name, t_type_data *type) 
     t_decl_data *result = make_decl();
     result->cat = DECL_no_value;
     result->name = name;
-    result->type = null;
+    result->type = type;
     return result;
 }
 
