@@ -22,7 +22,7 @@ static void print_expr(t_expr_data *expr) {
             printf(")");
         } break;
         case EXPR_binary: {
-            printf("%s ", get_operator_string(expr->operation.cat));
+            printf("(%s ", get_operator_string(expr->operation.cat));
             print_expr(expr->operation.expr1);
             printf(" ");
             print_expr(expr->operation.expr2);
@@ -136,15 +136,17 @@ static void print_decl(t_decl_data *decl, int level) {
 }
 
 static void print_stmt(t_stmt_data *stmt, int level) {
-    print_level(level);
     switch(stmt->cat) {
         case STMT_break: {
+            print_level(level);
             printf("break;\n");
         } break;
         case STMT_continue: {
+            print_level(level);
             printf("continue;\n");
         } break;
         case STMT_return: {
+            print_level(level);
             if(stmt->return_expr != null) {
                 printf("return ");
                 print_expr(stmt->return_expr);
@@ -155,23 +157,40 @@ static void print_stmt(t_stmt_data *stmt, int level) {
             }
         } break;
         case STMT_print: {
+            print_level(level);
             printf("print ");
             print_expr(stmt->print_expr);
             printf(";\n");
         } break;
         case STMT_if: {
+            printf("\n");
+            print_level(level);
             printf("if ");
             print_expr(stmt->if_data.condition);
-            if(stmt->if_data.true_branch != null) {
-                print_stmt(stmt->if_data.true_branch, level+1);
+            
+            t_stmt_data *true_branch = stmt->if_data.true_branch;
+            if(true_branch != null) {
+                printf(" ");
+                print_stmt(true_branch, level);
             }
             else printf(";\n");
-            if(stmt->if_data.false_branch != null) {
-                print_stmt(stmt->if_data.false_branch, level+1);
+            
+            t_stmt_data *false_branch = stmt->if_data.false_branch;
+            if(false_branch != null) {
+                print_level(level);
+                printf("else");
+                if(false_branch->cat == STMT_block) {
+                    printf(" ");
+                    print_stmt(false_branch, level);
+                }
+                else {
+                    printf(" ");
+                    print_stmt(false_branch, 0);
+                }
             }
-            else printf(";\n");
         } break;
         case STMT_while: {
+            print_level(level);
             printf("while ");
             print_expr(stmt->while_data.condition);
             if(stmt->while_data.block != null) {
@@ -180,15 +199,20 @@ static void print_stmt(t_stmt_data *stmt, int level) {
             else printf(";\n");
         } break;
         case STMT_decl: {
+            print_level(level);
             t_decl_data *decl = stmt->decl_data;
             print_decl(decl, level);
         } break;
         case STMT_expr: {
+            print_level(level);
             print_expr(stmt->expr);
             printf(";\n");
         } break;
         case STMT_block: {
-            print_stmt_list(&stmt->block_data, level);
+            printf("{\n");
+            print_stmt_list(&stmt->block_data, level+1);
+            print_level(level);
+            printf("}\n");
         } break;
         default: assert(false);
     }
