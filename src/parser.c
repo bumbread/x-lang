@@ -1,18 +1,4 @@
 
-static t_ast_list *alloc_list(void) {
-    t_ast_list *result = global_alloc(sizeof(t_ast_list));
-    result->first = null;
-    result->last = null;
-    return result;
-}
-
-static t_ast_list_link *alloc_list_link(void) {
-    t_ast_list_link *result = global_alloc(sizeof(t_ast_list_link));
-    result->next = null;
-    result->prev = null;
-    return result;
-}
-
 static inline bool unexpected_last_token(t_lexstate *state) {
     push_errorf("%s(%d, %d): unexpected token %s.",
                 state->filename,
@@ -28,89 +14,38 @@ static inline void parse_error(char const *string, t_location loc) {
                 string);
 }
 
-static void node_list_push(t_ast_list *list, t_ast_list_link *to_attach) {
-    to_attach->next = null;
-    to_attach->prev = list->last;
-    if(list->last != null) {
-        list->last->next = to_attach;
-    }
-    else {
-        list->first = to_attach;
-    }
-    list->last = to_attach;
-}
-
-static void load_expr_node_data(t_ast_node *node, t_token *tok) {
-    node->cat = AST_expr_node;
-    switch(tok->kind) {
-        case TOKEN_int: {
-            node->expr.cat = EXPR_int_value;
-            node->expr.ivalue = tok->int_value;
-            node->expr.type = type_int;
-        } break;
-        case TOKEN_flt: {
-            node->expr.cat = EXPR_float_value;
-            node->expr.fvalue = tok->flt_value;
-            node->expr.type = type_float;
-        } break;
-        case TOKEN_str: {
-            node->expr.cat = EXPR_string_value;
-            node->expr.svalue = tok->str_value;
-            node->expr.type = type_string;
-        } break;
-        case TOKEN_idn: {
-            node->expr.cat = EXPR_variable;
-            node->expr.var_name = tok->str_value;
-            node->expr.type = null; // to be derived on the typecheck stage
-        } break;
-        default:
-        assert(false);
-    }
-    
-}
-
 //--------------------||
 // EXPRESSION PARSING ||
 //--------------------||
 
-static t_ast_node *parse_expr(t_lexstate *state);
+static t_expr_data *parse_expr(t_lexstate *state);
 
-static t_ast_node *parse_expr_list(t_lexstate *state,
-                                   t_token_kind seq_separator,
-                                   t_token_kind seq_terminator) {
-    t_ast_node *node = alloc_node();
-    node->cat = AST_list_node;
-    if(token_is_kind(state, seq_terminator)) {
-        return node;
-    }
-    while(true) {
-        t_ast_node *value = parse_expr(state);
-        assert(value);
-        if(value == null) {
-            return node;
-        }
-        t_ast_list_link *link = alloc_list_link();
-        link->p = value;
-        node_list_push(&node->list, link);
-        if(!token_match_kind(state, seq_separator)) {
-            break;
-        }
-    }
-    return node;
-}
-
-static t_ast_node *parse_expr1(t_lexstate *state) {
-    t_ast_node *node;
+static t_expr_data *parse_expr_value(t_lexstate *state) {
+    t_expr_data *node;
     if(token_match_kind(state, '(')) {
         node = parse_expr(state);
         token_expect_kind(state, ')');
     }
-    else if(state->last_token.kind == TOKEN_str
-            || state->last_token.kind == TOKEN_idn
-            || state->last_token.kind == TOKEN_int
-            || state->last_token.kind == TOKEN_flt) {
-        node = alloc_node();
-        load_expr_node_data(node, &state->last_token);
+    else if(state->last_token.kind == TOKEN_str) {
+        node = make_static_value();
+        node->cat = VALUE_string;
+        node->value.s = state->last_token.str_value;
+        lex_next_token(state);
+    }
+    else if(state->last_token.kind == TOKEN_int) {
+        node = make_static_value();
+        node->cat = VALUE_int;
+        node->value.i = state->last_token.int_value;
+        lex_next_token(state);
+    }
+    else if(state->last_token.kind == TOKEN_flt) {
+        node = make_static_value();
+        node->cat = VALUE_float;
+        node->value.f = state->last_token.flt_value;
+        lex_next_token(state);
+    }
+    else if(state->last_token.kind == TOKEN_idn) {
+        node = make_identifier_expr(state->last_token.str_value);
         lex_next_token(state);
     }
     else {
@@ -119,98 +54,71 @@ static t_ast_node *parse_expr1(t_lexstate *state) {
     }
     
     if(token_match_kind(state, '(')) {
-        
-        t_ast_node *parameter_list = parse_expr_list(state, ',', ')');
+        t_expr_list *parameter_list = alloc_expr_list();
+        while(!token_is_kind(state, ')')) {
+            t_expr_data *expr = parse_expr(state);
+            if(expr == null) return null;
+            expr_list_push(parameter_list, expr);
+            if(!token_is_kind(state, ')')) {
+                token_match_kind(state, ',');
+            }
+        }
         token_expect_kind(state, ')');
-        
-        t_ast_node *function_call = alloc_node();
-        function_call->cat = AST_expr_node;
-        function_call->expr.cat = EXPR_binary_op;
-        function_call->expr.op = BINARY_function_call;
-        function_call->expr.opr1 = node;
-        function_call->expr.opr2 = parameter_list;
-        node = function_call;
+        node = make_function_call(node, parameter_list);
     }
     return node;
 }
 
-static t_ast_node *parse_expr2(t_lexstate *state) {
+static t_expr_data *parse_expr_term(t_lexstate *state) {
     // sub
     if(token_match_kind(state, '-')) {
-        t_ast_node *expr = parse_expr2(state);
+        t_expr_data *expr = parse_expr_term(state);
         if(expr == null) return null;
-        t_ast_node *node = alloc_node();
-        node->cat = AST_expr_node;
-        node->expr.cat = EXPR_unary_op;
-        node->expr.op = UNARY_sub;
-        node->expr.opr1 = expr;
-        return node;
+        return make_unary_expr(UNARY_sub, expr);
     }
     
     // address-of
     else if(token_match_kind(state, '$')) {
-        t_ast_node *expr = parse_expr2(state);
+        t_expr_data *expr = parse_expr_term(state);
         if(expr == null) return null;
-        t_ast_node *node = alloc_node();
-        node->cat = AST_expr_node;
-        node->expr.cat = EXPR_unary_op;
-        node->expr.op = UNARY_addr;
-        node->expr.opr1 = expr;
-        return node;
+        return make_unary_expr(UNARY_addr, expr);
     }
     
     // deref
     else if(token_match_kind(state, '@')) {
-        t_ast_node *expr = parse_expr2(state);
+        t_expr_data *expr = parse_expr_term(state);
         if(expr == null) return null;
-        t_ast_node *node = alloc_node();
-        node->cat = AST_expr_node;
-        node->expr.cat = EXPR_unary_op;
-        node->expr.op = UNARY_deref;
-        node->expr.opr1 = expr;
-        return node;
+        return make_unary_expr(UNARY_deref, expr);
     }
+    
     else {
-        t_ast_node *result = parse_expr1(state);
+        t_expr_data *result = parse_expr_value(state);
         if(result == null) {
             return null;
         }
-        
         while(true) {
             if(token_match_kind(state, '[')) {
-                t_ast_node *first_index = null;
+                t_expr_data *first_index = null;
                 if(!token_is_kind(state, ':')) {
                     first_index = parse_expr(state);
-                    if(first_index == null) {
-                        return null;
-                    }
+                    if(first_index == null) return null;
                 }
-                t_ast_node *node = alloc_node();
+                t_expr_data *node;
                 
+                // slicing operator
                 if(token_match_kind(state, ':')) {
-                    node->cat = AST_expr_node; //slicing operator
-                    node->expr.cat = EXPR_ternary_op;
-                    node->expr.op = TERNARY_slice;
-                    node->expr.opr1 = result;
-                    node->expr.opr2 = first_index;
-                    
-                    t_ast_node *second_index = null;
+                    t_expr_data *second_index = null;
                     if(!token_is_kind(state, ']')) {
                         second_index = parse_expr(state);
-                        if(second_index == null) {
-                            return null;
-                        }
+                        if(second_index == null) return null;
                     }
-                    node->expr.opr3 = second_index;
+                    node = make_ternary_expr(TERNARY_slice, result, first_index, second_index);
                     token_expect_kind(state, ']');
                 }
                 
+                // array access
                 else {
-                    node->cat = AST_expr_node; // array access operator
-                    node->expr.cat = EXPR_binary_op;
-                    node->expr.op = BINARY_subscript;
-                    node->expr.opr1 = result;
-                    node->expr.opr2 = first_index;
+                    node = make_binary_expr(BINARY_subscript, result, first_index);
                     token_expect_kind(state, ']');
                 }
                 result = node;
@@ -221,591 +129,429 @@ static t_ast_node *parse_expr2(t_lexstate *state) {
     }
 }
 
-static t_ast_node *parse_expr3(t_lexstate *state) {
-    t_ast_node *operand_left = parse_expr2(state);
-    if(null == operand_left) return null;
+static t_expr_data *parse_expr_factor(t_lexstate *state) {
+    t_expr_data *lhs = parse_expr_term(state);
+    if(null == lhs) return null;
     while(true) {
         
         if(token_is_kind(state, '*')) {
             lex_next_token(state);
-            t_ast_node *operand_right = parse_expr2(state);
-            if(operand_right == null) return null;
-            t_ast_node *node = alloc_node();
-            node->cat = AST_expr_node;
-            node->expr.cat = EXPR_binary_op;
-            node->expr.op = BINARY_mul;
-            node->expr.opr1 = operand_left;
-            node->expr.opr2 = operand_right;
-            operand_left = node;
+            t_expr_data *rhs = parse_expr_term(state);
+            if(rhs == null) return null;
+            lhs = make_binary_expr(BINARY_mul, lhs, rhs);
         }
         
         else if(token_is_kind(state, '/')) {
             lex_next_token(state);
-            t_ast_node *operand_right = parse_expr2(state);
-            if(operand_right == null) return null;
-            t_ast_node *node = alloc_node();
-            node->cat = AST_expr_node;
-            node->expr.cat = EXPR_binary_op;
-            node->expr.op = BINARY_div;
-            node->expr.opr1 = operand_left;
-            node->expr.opr2 = operand_right;
-            operand_left = node;
+            t_expr_data *rhs = parse_expr_term(state);
+            if(rhs == null) return null;
+            lhs= make_binary_expr(BINARY_div, lhs, rhs);
         }
         else break;
     }
-    return operand_left;
+    return lhs;
 }
 
-static t_ast_node *parse_expr4(t_lexstate *state) {
-    t_ast_node *operand_left = parse_expr3(state);
-    if(null != operand_left) {
+static t_expr_data *parse_expr_arithmetic(t_lexstate *state) {
+    t_expr_data *lhs = parse_expr_factor(state);
+    if(lhs != null) {
         while(true) {
             
             if(token_is_kind(state, '+')) {
                 lex_next_token(state);
-                t_ast_node *operand_right = parse_expr3(state);
-                if(operand_right == null) return null;
-                t_ast_node *node = alloc_node();
-                node->cat = AST_expr_node;
-                node->expr.cat = EXPR_binary_op;
-                node->expr.op = BINARY_add;
-                node->expr.opr1 = operand_left;
-                node->expr.opr2 = operand_right;
-                operand_left = node;
+                t_expr_data *rhs = parse_expr_factor(state);
+                if(rhs == null) return null;
+                lhs = make_binary_expr(BINARY_add, lhs, rhs);
             }
             
             else if(token_is_kind(state, '-')) {
                 lex_next_token(state);
-                t_ast_node *operand_right = parse_expr3(state);
-                if(operand_right == null) return null;
-                t_ast_node *node = alloc_node();
-                node->cat = AST_expr_node;
-                node->expr.cat = EXPR_binary_op;
-                node->expr.op = BINARY_sub;
-                node->expr.opr1 = operand_left;
-                node->expr.opr2 = operand_right;
-                operand_left = node;
+                t_expr_data *rhs = parse_expr_factor(state);
+                if(rhs == null) return null;
+                lhs = make_binary_expr(BINARY_sub, lhs, rhs);
             }
             else break;
         }
     }
-    return operand_left;
+    return lhs;
 }
 
-static t_ast_node *parse_expr5(t_lexstate *state) {
-    t_ast_node *operand_left = parse_expr4(state);
-    if(null == operand_left) return null;
+// TODO(bumbread): should there be a while loop?
+static t_expr_data *parse_expr_relational(t_lexstate *state) {
+    t_expr_data *lhs = parse_expr_arithmetic(state);
+    if(lhs == null) return null;
     while(true) {
         
         if(token_is_kind(state, '<')) {
             lex_next_token(state);
-            t_ast_node *operand_right = parse_expr4(state);
-            if(operand_right == null) return null;
-            t_ast_node *node = alloc_node();
-            node->cat = AST_expr_node;
-            node->expr.cat = EXPR_binary_op;
-            node->expr.op = BINARY_less;
-            node->expr.opr1 = operand_left;
-            node->expr.opr2 = operand_right;
-            operand_left = node;
+            t_expr_data *rhs = parse_expr_arithmetic(state);
+            if(rhs == null) return null;
+            lhs = make_binary_expr(BINARY_less, lhs, rhs);
         }
         
         else if(token_is_kind(state, '>')) {
             lex_next_token(state);
-            t_ast_node *operand_right = parse_expr4(state);
-            if(operand_right == null) return null;
-            t_ast_node *node = alloc_node();
-            node->cat = AST_expr_node;
-            node->expr.cat = EXPR_binary_op;
-            node->expr.op = BINARY_greater;
-            node->expr.opr1 = operand_left;
-            node->expr.opr2 = operand_right;
-            operand_left = node;
+            t_expr_data *rhs = parse_expr_arithmetic(state);
+            if(rhs == null) return null;
+            lhs = make_binary_expr(BINARY_greater, lhs, rhs);
         }
         
         else if(token_is_kind(state, TOKEN_cmp_leq)) {
             lex_next_token(state);
-            t_ast_node *operand_right = parse_expr4(state);
-            if(operand_right == null) return null;
-            t_ast_node *node = alloc_node();
-            node->cat = AST_expr_node;
-            node->expr.cat = EXPR_binary_op;
-            node->expr.op = BINARY_leq;
-            node->expr.opr1 = operand_left;
-            node->expr.opr2 = operand_right;
-            operand_left = node;
+            t_expr_data *rhs = parse_expr_arithmetic(state);
+            if(rhs == null) return null;
+            lhs = make_binary_expr(BINARY_leq, lhs, rhs);
         }
         
         else if(token_is_kind(state, TOKEN_cmp_geq)) {
             lex_next_token(state);
-            t_ast_node *operand_right = parse_expr4(state);
-            if(operand_right == null) return null;
-            t_ast_node *node = alloc_node();
-            node->cat = AST_expr_node;
-            node->expr.cat = EXPR_binary_op;
-            node->expr.op = BINARY_geq;
-            node->expr.opr1 = operand_left;
-            node->expr.opr2 = operand_right;
-            operand_left = node;
+            t_expr_data *rhs = parse_expr_arithmetic(state);
+            if(rhs == null) return null;
+            lhs = make_binary_expr(BINARY_geq, lhs, rhs);
         }
         
         else if(token_is_kind(state, TOKEN_cmp_eq)) {
             lex_next_token(state);
-            t_ast_node *operand_right = parse_expr4(state);
-            if(operand_right == null) return null;
-            t_ast_node *node = alloc_node();
-            node->cat = AST_expr_node;
-            node->expr.cat = EXPR_binary_op;
-            node->expr.op = BINARY_eq;
-            node->expr.opr1 = operand_left;
-            node->expr.opr2 = operand_right;
-            operand_left = node;
+            t_expr_data *rhs = parse_expr_arithmetic(state);
+            if(rhs == null) return null;
+            lhs = make_binary_expr(BINARY_eq, lhs, rhs);
         }
         
         else if(token_is_kind(state, TOKEN_cmp_neq)) {
             lex_next_token(state);
-            t_ast_node *operand_right = parse_expr4(state);
-            if(operand_right == null) return null;
-            t_ast_node *node = alloc_node();
-            node->cat = AST_expr_node;
-            node->expr.cat = EXPR_binary_op;
-            node->expr.op = BINARY_neq;
-            node->expr.opr1 = operand_left;
-            node->expr.opr2 = operand_right;
-            operand_left = node;
+            t_expr_data *rhs = parse_expr_arithmetic(state);
+            if(rhs == null) return null;
+            lhs = make_binary_expr(BINARY_neq, lhs, rhs);
         }
         else break;
     }
-    return operand_left;
+    return lhs;
 }
 
-static t_ast_node *parse_expr6(t_lexstate *state) {
-    t_ast_node *operand_left = parse_expr5(state);
-    if(null == operand_left) return null;
+static t_expr_data *parse_expr_and_level(t_lexstate *state) {
+    t_expr_data *lhs = parse_expr_relational(state);
+    if(lhs == null) return null;
     while(token_is_identifier(state, keyword_and)) {
         lex_next_token(state);
-        t_ast_node *operand_right = parse_expr5(state);
-        if(operand_right == null) return null;
-        t_ast_node *node = alloc_node();
-        node->cat = AST_expr_node;
-        node->expr.cat = EXPR_binary_op;
-        node->expr.op = BINARY_and;
-        node->expr.opr1 = operand_left;
-        node->expr.opr2 = operand_right;
-        operand_left = node;
+        t_expr_data *rhs = parse_expr_relational(state);
+        if(rhs == null) return null;
+        lhs = make_binary_expr(BINARY_and, lhs, rhs);
     }
-    return operand_left;
+    return lhs;
 }
 
-static t_ast_node *parse_expr7(t_lexstate *state) {
-    t_ast_node *operand_left = parse_expr6(state);
-    if(null == operand_left) return null;
+static t_expr_data *parse_expr_or_level(t_lexstate *state) {
+    t_expr_data *lhs = parse_expr_and_level(state);
+    if(lhs == null) return null;
     while(token_is_identifier(state, keyword_or)) {
         lex_next_token(state);
-        t_ast_node *operand_right = parse_expr6(state);
-        if(operand_right == null) return null;
-        t_ast_node *node = alloc_node();
-        node->cat = AST_expr_node;
-        node->expr.cat = EXPR_binary_op;
-        node->expr.op = BINARY_or;
-        node->expr.opr1 = operand_left;
-        node->expr.opr2 = operand_right;
-        operand_left = node;
+        t_expr_data *rhs = parse_expr_and_level(state);
+        if(rhs == null) return null;
+        lhs = make_binary_expr(BINARY_or, lhs, rhs);
     }
-    return operand_left;
+    return lhs;
 }
 
-static t_ast_node *parse_expr(t_lexstate *state) {
-    return parse_expr7(state);
+static t_expr_data *parse_expr(t_lexstate *state) {
+    return parse_expr_or_level(state);
 }
 
 /* STATEMENTS PARSER */
 
 
-static t_ast_node *parse_assignment(t_lexstate *state) {
-    t_ast_node *assign_node = parse_expr7(state);
-    if(null != assign_node) {
-        
-        if(token_is_kind(state, TOKEN_add_ass)) {
-            lex_next_token(state);
-            t_ast_node *operand_right = parse_expr7(state);
-            t_ast_node *node = alloc_node();
-            node->cat = AST_stmt_node;
-            node->stmt.cat = STMT_assignment;
-            node->stmt.ass_op = BINARY_add_ass;
-            node->stmt.lvalue = assign_node;
-            node->stmt.rvalue = operand_right;
-            assign_node = node;
-        }
-        
-        else if(token_is_kind(state, TOKEN_sub_ass)) {
-            lex_next_token(state);
-            t_ast_node *operand_right = parse_expr7(state);
-            t_ast_node *node = alloc_node();
-            node->cat = AST_stmt_node;
-            node->stmt.cat = STMT_assignment;
-            node->stmt.ass_op = BINARY_sub_ass;
-            node->stmt.lvalue = assign_node;
-            node->stmt.rvalue = operand_right;
-            assign_node = node;
-        }
-        
-        else if(token_is_kind(state, TOKEN_mul_ass)) {
-            lex_next_token(state);
-            t_ast_node *operand_right = parse_expr7(state);
-            t_ast_node *node = alloc_node();
-            node->cat = AST_stmt_node;
-            node->stmt.cat = STMT_assignment;
-            node->stmt.ass_op = BINARY_mul_ass;
-            node->stmt.lvalue = assign_node;
-            node->stmt.rvalue = operand_right;
-            assign_node = node;
-        }
-        
-        else if(token_is_kind(state, TOKEN_div_ass)) {
-            lex_next_token(state);
-            t_ast_node *operand_right = parse_expr7(state);
-            t_ast_node *node = alloc_node();
-            node->cat = AST_stmt_node;
-            node->stmt.cat = STMT_assignment;
-            node->stmt.ass_op = BINARY_div_ass;
-            node->stmt.lvalue = assign_node;
-            node->stmt.rvalue = operand_right;
-            assign_node = node;
-        }
-        
-        else if(token_is_kind(state, '=')) {
-            lex_next_token(state);
-            t_ast_node *operand_right = parse_expr7(state);
-            t_ast_node *node = alloc_node();
-            node->cat = AST_stmt_node;
-            node->stmt.cat = STMT_assignment;
-            node->stmt.ass_op = BINARY_ass;
-            node->stmt.lvalue = assign_node;
-            node->stmt.rvalue = operand_right;
-            assign_node = node;
-        }
+static t_stmt_data *parse_expr_stmt(t_lexstate *state) {
+    t_expr_data *expr = parse_expr(state);
+    if(expr == null) return null;
+    
+    if(token_is_kind(state, TOKEN_add_ass)) {
+        lex_next_token(state);
+        t_expr_data *rhs = parse_expr(state);
+        expr = make_binary_expr(BINARY_add_ass, expr, rhs);
     }
-    return assign_node;
+    
+    else if(token_is_kind(state, TOKEN_sub_ass)) {
+        lex_next_token(state);
+        t_expr_data *rhs = parse_expr(state);
+        expr = make_binary_expr(BINARY_sub_ass, expr, rhs);
+    }
+    
+    else if(token_is_kind(state, TOKEN_mul_ass)) {
+        lex_next_token(state);
+        t_expr_data *rhs = parse_expr(state);
+        expr = make_binary_expr(BINARY_mul_ass, expr, rhs);
+    }
+    
+    else if(token_is_kind(state, TOKEN_div_ass)) {
+        lex_next_token(state);
+        t_expr_data *rhs = parse_expr(state);
+        expr = make_binary_expr(BINARY_div_ass, expr, rhs);
+    }
+    
+    else if(token_is_kind(state, '=')) {
+        lex_next_token(state);
+        t_expr_data *rhs = parse_expr(state);
+        expr = make_binary_expr(BINARY_ass, expr, rhs);
+    }
+    
+    return make_expression_stmt(expr);
 }
 
 
-static t_ast_node *parse_stmts(t_lexstate *state);
-static t_ast_node *parse_stmt(t_lexstate *state);
+static t_stmt_list *parse_stmt_list(t_lexstate *state);
+static t_stmt_data *parse_stmt_block(t_lexstate *state);
+static t_stmt_data *parse_stmt(t_lexstate *state);
+static t_decl_data *parse_declaration(t_lexstate *state);
 
-static t_ast_node *parse_if_stmt(t_lexstate *state) {
+static t_stmt_data *parse_if_stmt(t_lexstate *state) {
     token_expect_identifier(state, keyword_if);
-    t_ast_node *node = alloc_node();
-    t_ast_node *condition = parse_expr(state);
-    t_ast_node *block;
-    if(token_is_kind(state, ';')) {
-        block = null;
-    }
-    else {
-        block = parse_stmts(state);
+    t_expr_data *condition = parse_expr(state);
+    t_stmt_data *true_branch = null;
+    t_stmt_data *false_branch = null;
+    
+    // TODO(bumbread): do syntax for inline true branch stmt?
+    if(!token_is_kind(state, ';')) {
+        true_branch = parse_stmt_block(state);
     }
     if(token_match_identifier(state, keyword_else)) {
-        t_ast_node *else_stmt;
         if(token_is_kind(state, '{')) {
-            else_stmt = parse_stmts(state);
-        }
-        else if(token_match_kind(state, ';')) {
-            else_stmt = null;
+            false_branch = parse_stmt_block(state);
         }
         else {
-            else_stmt = parse_stmt(state);
+            false_branch = parse_stmt(state);
             token_expect_kind(state, ';');
         }
-        node->stmt.if_false_block = else_stmt;
     }
     
-    node->stmt.if_condition = condition;
-    node->stmt.if_true_block = block;
-    node->stmt.cat = STMT_if;
-    node->cat = AST_stmt_node;
-    return node;
+    return make_if_stmt(condition, true_branch, false_branch);
 }
 
-static t_ast_node *parse_while_stmt(t_lexstate *state) {
+static t_stmt_data *parse_while_stmt(t_lexstate *state) {
     token_expect_identifier(state, keyword_while);
-    t_ast_node *condition = parse_expr(state);
-    t_ast_node *block;
-    if(token_is_kind(state, ';')) {
-        block = null;
+    t_expr_data *condition = parse_expr(state);
+    t_stmt_data *block = null;
+    
+    if(!token_is_kind(state, ';')) {
+        block = parse_stmt_block(state);
+    }
+    
+    return make_while_stmt(condition, block);
+}
+
+static t_type_data *parse_type(t_lexstate *state) {
+    
+    t_type_data *type = null;
+    
+    if(token_expect_peek_kind(state, TOKEN_idn)) {
+        if(state->last_token.str_value == keyword_int) {
+            type = &type_int;
+        }
+        else if(state->last_token.str_value == keyword_bool) {
+            type = &type_bool;
+        }
+        else if(state->last_token.str_value == keyword_string) {
+            type = &type_string;
+        }
+        else if(state->last_token.str_value == keyword_float) {
+            type = &type_float;
+        }
+        else if(state->last_token.str_value == keyword_byte) {
+            type = &type_byte;
+        }
+        else {
+            parse_error("aliase types are not supported", state->loc);
+            return null;
+        }
+        lex_next_token(state);
     }
     else {
-        block = parse_stmts(state);
+        return null;
     }
-    t_ast_node *node = alloc_node();
-    node->cat = AST_stmt_node;
-    node->stmt.cat = STMT_while;
-    node->stmt.while_condition = condition;
-    node->stmt.while_block = block;
-    return node;
-}
-
-static t_ast_node *parse_type(t_lexstate *state) {
-    t_ast_node *node = alloc_node();
-    node->cat = AST_type_node;
-    
-    t_token primitive = state->last_token;
-    if(token_expect_kind(state, TOKEN_idn)) {
-        node->type.cat = TYPE_alias;
-        node->type.name = primitive.str_value;
-    }
-    else return null;
     
     while(true) {
-        
+        // pointer to
         if(token_match_kind(state, '$')) {
-            t_ast_node *pnode = alloc_node();
-            pnode->cat = AST_type_node;
-            pnode->type.cat = TYPE_pointer;
-            pnode->type.base_type = node;
-            node = pnode;
+            type = make_type_pointer_to(type);
         }
+        // slice of
         else if(token_match_kind(state, '[')) {
             if(!token_expect_kind(state, ']')) {
                 printf("  note: x-lang doesn't have constant array types.");
                 return null;
             }
-            t_ast_node *pnode = alloc_node();
-            pnode->cat = AST_type_node;
-            pnode->type.cat = TYPE_slice;
-            pnode->type.base_type = node;
-            node = pnode;
+            type = make_type_slice_of(type);
         }
+        // function returning
         else if(token_match_kind(state, TOKEN_left_arrow)) {
             if(!token_expect_kind(state, '(')) {
                 return null;
             }
-            t_ast_node *decls = alloc_node();
-            decls->cat = AST_list_node;
-            decls->list.first = null;
-            decls->list.last = null;
-            t_ast_node *function_node = alloc_node();
-            function_node->cat = AST_type_node;
-            function_node->type.cat = TYPE_function;
-            function_node->type.parameters = decls;
-            function_node->type.return_type = node;
-            node = function_node;
-            while(true) {
-                if(token_is_kind(state, ')')) {
-                    break;
-                }
-                t_ast_node *parameter_type = parse_type(state);
-                assert(parameter_type->cat == AST_type_node);
-                if(parameter_type == null) {
-                    parse_error("no type in function declarator", state->loc);
-                }
-                t_intern const *opt_param_name = null;
-                t_token parameter_name = state->last_token;
-                if(token_match_kind(state, TOKEN_idn)) {
-                    opt_param_name = parameter_name.str_value;
-                }
-                t_ast_node *param_decl = alloc_node();
-                param_decl->cat = AST_stmt_node;
-                param_decl->stmt.cat = STMT_declaration;
-                param_decl->stmt.decl_type = parameter_type;
-                param_decl->stmt.decl_name = opt_param_name;
-                // TODO(bumbread): function default parameters ?
-                param_decl->stmt.decl_value = null;
-                
-                t_ast_list_link *param_link = alloc_list_link();
-                param_link->p = param_decl;
-                node_list_push(&decls->list, param_link);
-                
-                if(!token_match_kind(state, ';')) {
-                    if(!token_is_kind(state, ')')) {
-                        parse_error("expected either ; or )", state->loc);
-                    }
-                    break;
+            t_decl_list *decl_list = alloc_decl_list();
+            while(!token_is_kind(state, ')')) {
+                t_decl_data *param_decl = parse_declaration(state);
+                decl_list_push(decl_list, param_decl);
+                if(!token_match_kind(state, ',') && !token_is_kind(state, ')')) {
+                    parse_error("expected either , or )", state->loc);
+                    return null;
                 }
             }
             if(!token_expect_kind(state, ')')) {
                 return null;
             }
+            type = make_type_function(type, decl_list);
         }
+        // end
         else {
             break;
         }
     }
     
-    return node;
+    return type;
 }
 
-static t_ast_node *parse_declaration(t_lexstate *state) {
-    if(token_expect_kind(state, ':')) {
-        t_ast_node *node = alloc_node();
-        node->cat = AST_stmt_node;
-        node->stmt.cat = STMT_declaration;
-        node->stmt.decl_type = parse_type(state);
-        
-        t_token name = state->last_token;
-        if(token_expect_kind(state, TOKEN_idn)) {
-            if(token_is_keyword(&name)) {
-                push_errorf("keywords are not allowed as variable name", name.loc);
-            }
-            node->stmt.decl_name = name.str_value;
+static t_decl_data *parse_declaration(t_lexstate *state) {
+    t_type_data *type = parse_type(state);
+    t_intern const *name;
+    
+    if(token_expect_peek_kind(state, TOKEN_idn)) {
+        // TODO(bumbread): maybe this should be handled at the cheker level?
+        if(token_is_keyword(&state->last_token)) {
+            push_errorf("keywords are not allowed as variable name", state->loc);
         }
-        
-        if(token_match_kind(state, '=')) {
-            node->stmt.decl_value = parse_expr(state);
-            token_expect_kind(state, ';');
-        }
-        else if(token_is_kind(state, '{')) {
-            node->stmt.decl_value = parse_stmts(state);
-        }
-        else {
-            if(!token_expect_kind(state, ';')) {
-                return null;
-            }
-        }
-        
-        assert(node->stmt.decl_type != null);
-        t_ast_node *decl_type = node->stmt.decl_type;
-        assert(decl_type->cat == AST_type_node);
-        if(decl_type->type.cat == TYPE_function) {
-            t_ast_list_link *func_link = alloc_list_link();
-            func_link->p = node;
-            node_list_push(&all_procs, func_link);
-        }
-        return node;
+        name = state->last_token.str_value;
+        lex_next_token(state);
     }
+    
+    if(token_match_kind(state, '=')) {
+        return make_decl_expr_value(name, type, parse_expr(state));
+    }
+    else if(token_is_kind(state, '{')) {
+        return make_decl_block_value(name, type, parse_stmt_list(state));
+    }
+    else {
+        return make_decl_no_value(name, type);
+    }
+    
+    // TODO(bumbread): if function push to all procs list.
     return null;
 }
 
-static t_ast_node *parse_stmt(t_lexstate *state) {
-    t_ast_node *node = null;
-    if(token_is_identifier(state, keyword_if)) {
-        node = parse_if_stmt(state);
-    }
-    else if(token_is_identifier(state, keyword_while)) {
-        node = parse_while_stmt(state);
-    }
-    else if(token_is_kind(state, ':')) {
-        node = parse_declaration(state);
-    }
-    else if(token_match_identifier(state, keyword_return)) {
-        node = alloc_node();
-        node->cat = AST_stmt_node;
-        node->stmt.cat = STMT_return;
-        if(!token_is_kind(state, ';')) {
-            node->stmt.stmt_value = parse_expr(state);
-        }
-        else {
-            node->stmt.stmt_value = null;
-        }
-        token_expect_kind(state, ';');
-    }
-    else if(token_match_identifier(state, keyword_break)) {
-        node = alloc_node();
-        node->cat = AST_stmt_node;
-        node->stmt.cat = STMT_break;
-        token_expect_kind(state, ';');
-    }
-    else if(token_match_identifier(state, keyword_continue)) {
-        node = alloc_node();
-        node->cat = AST_stmt_node;
-        node->stmt.cat = STMT_continue;
-        token_expect_kind(state, ';');
-    }
-    else if(token_match_identifier(state, keyword_print)) {
-        node = alloc_node();
-        node->cat = AST_stmt_node;
-        node->stmt.cat = STMT_print;
-        node->stmt.stmt_value = parse_expr(state);
-        token_expect_kind(state, ';');
-    }
-    else if(token_is_kind(state, '{')) {
-        node = parse_stmts(state);
-    }
-    else if(token_match_kind(state, ';')) {
-        return null;
-    }
-    else {
-        if(state->last_token.kind == TOKEN_eof) {
-            node = null;
-        }
-        else {
-            node = parse_assignment(state);
-            token_expect_kind(state, ';');
-        }
-    }
-    assert(node != null);
-    return node;
+static t_stmt_data *parse_declaration_stmt(t_lexstate *state) {
+    token_expect_kind(state, ':');
+    t_decl_data *decl_data = parse_declaration(state);
+    t_stmt_data *decl = make_decl_stmt(decl_data);
+    return decl;
 }
 
-static t_ast_node *parse_stmts(t_lexstate *state) {
+static t_stmt_data *parse_return_stmt(t_lexstate *state) {
+    token_match_identifier(state, keyword_return);
+    t_expr_data *expr = null;
+    if(!token_match_kind(state, ';')) {
+        parse_expr(state);
+    }
+    return make_return_stmt(expr);
+}
+
+static t_stmt_data *parse_print_stmt(t_lexstate *state) {
+    token_match_identifier(state, keyword_print);
+    t_expr_data *expr = parse_expr(state);
+    token_expect_kind(state, ';');
+    return make_print_stmt(expr);
+}
+
+static t_stmt_data *parse_break_stmt(t_lexstate *state) {
+    token_expect_identifier(state, keyword_break);
+    token_expect_kind(state, ';');
+    return make_stmt_cat(STMT_break);
+}
+
+static t_stmt_data *parse_continue_stmt(t_lexstate *state) {
+    token_expect_identifier(state, keyword_continue);
+    token_expect_kind(state, ';');
+    return make_stmt_cat(STMT_continue);
+}
+
+static t_stmt_data *parse_stmt(t_lexstate *state) {
+    if(token_is_identifier(state, keyword_if))            return parse_if_stmt(state);
+    else if(token_is_identifier(state, keyword_while))    return parse_while_stmt(state);
+    else if(token_is_kind(state, ':'))                    return parse_declaration_stmt(state);
+    else if(token_is_identifier(state, keyword_return))   return parse_return_stmt(state);
+    else if(token_is_identifier(state, keyword_break))    return parse_break_stmt(state);
+    else if(token_is_identifier(state, keyword_continue)) return parse_continue_stmt(state);
+    else if(token_is_identifier(state, keyword_print))    return parse_print_stmt(state);
+    else if(token_match_kind(state, ';'))                 return null;
+    else if(token_is_kind(state, '{'))                    return parse_stmt_block(state);
+    else if(!state->last_token.kind == TOKEN_eof)         return parse_expr_stmt(state);
+    return null;
+}
+
+static t_stmt_list *parse_stmt_list(t_lexstate *state) {
     if(!token_expect_kind(state, '{')) return null;
     
-    t_ast_node *block = alloc_node();
-    block->cat = AST_stmt_node;
-    block->stmt.cat = STMT_block;
-    while(true) {
-        if(token_match_kind(state, '}')) {
-            break;
+    t_stmt_list *list = alloc_stmt_list();
+    while(!token_is_kind(state, '}')) {
+        t_stmt_data *stmt = parse_stmt(state);
+        if(stmt != null) {
+            stmt_list_push(list, stmt);
         }
-        else if(state->last_token.kind == TOKEN_eof) {
-            unexpected_last_token(state);
-            break;
+    }
+    if(!token_expect_kind(state, '}')) {
+        return null;
+    }
+    return list;
+}
+
+static t_stmt_data *parse_stmt_block(t_lexstate *state) {
+    if(!token_expect_kind(state, '{')) return null;
+    
+    t_stmt_data *block = make_stmt_block();
+    while(!token_is_kind(state, '}')) {
+        t_stmt_data *stmt = parse_stmt(state);
+        if(stmt != null) {
+            block_append_stmt(block, stmt);
         }
-        else {
-            t_ast_node *node = parse_stmt(state);
-            if(node != null) {
-                t_ast_list_link *link = alloc_list_link();
-                link->p = node;
-                node_list_push(&block->stmt.statements, link);
-            }
-        }
+    }
+    if(!token_expect_kind(state, '}')) {
+        return null;
     }
     return block;
 }
 
-static t_ast_node *parse_global_scope(t_lexstate *state) {
-    t_ast_node *block = alloc_node();
-    block->cat = AST_stmt_node;
-    block->stmt.cat = STMT_block;
-    while(true) {
-        if(token_match_kind(state, TOKEN_eof)) {
-            break;
+static t_decl_list *parse_global_scope(t_lexstate *state) {
+    t_decl_list *decls = alloc_decl_list();
+    while(!token_is_kind(state, TOKEN_eof)) {
+        token_expect_kind(state, ':');
+        t_decl_data *decl = parse_declaration(state);
+        if(decl == null) {
+            parse_error("unable to parse declaration", state->loc);
+            return decls;
         }
-        else {
-            t_ast_node *node = parse_declaration(state);
-            if(node == null) {
-                parse_error("unable to parse declaration", state->loc);
-                return block;
-            }
-            t_ast_list_link *link = alloc_list_link();
-            link->p = node;
-            node_list_push(&block->stmt.statements, link);
-        }
+        decl_list_push(decls, decl);
     }
-    return block;
+    return decls;
 }
 
 // debug functions
-static t_ast_node *parse_ast_node_expr_level(char const *expr) {
+static t_expr_data *DEBUG_parse_ast_node_expr_level(char const *expr) {
     t_lexstate state;
     lex_init(&state, "@test", expr);
     lex_next_token(&state);
-    t_ast_node *code = parse_expr(&state);
+    t_expr_data *code = parse_expr(&state);
     print_error_buffer();
     return code;
 }
-static t_ast_node *parse_ast_node_stmt_level(char const *stmt) {
+static t_stmt_data *DEBUG_parse_ast_node_stmt_level(char const *stmt) {
     t_lexstate state;
     lex_init(&state, "@test", stmt);
     lex_next_token(&state);
-    t_ast_node *code = parse_stmt(&state);
+    t_stmt_data *code = parse_stmt(&state);
     print_error_buffer();
     return code;
 }
-static t_ast_node *parse_ast_node_global_level(char const *code_str) {
+static t_decl_list *parse_ast_node_global_level(char const *code_str) {
     t_lexstate state;
     lex_init(&state, "@test", code_str);
     lex_next_token(&state);
-    t_ast_node *code = parse_global_scope(&state);
+    t_decl_list *code = parse_global_scope(&state);
     print_error_buffer();
     return code;
 }

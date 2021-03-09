@@ -97,220 +97,254 @@ static void print_token(t_token *token) {
     printf("%s", get_token_string(token));
 }
 
-// ABSTRACT SYNTAX TREES
-
-struct t_ast_node_ typedef t_ast_node;
-struct t_type_node_ typedef t_type_node;
-struct t_value_node_ typedef t_value_node;
-struct t_stmt_node_ typedef t_stmt_node;
-
 enum {
-    AST_wtf,
-    AST_list_node,
-    AST_expr_node,
-    AST_type_node,
-    AST_stmt_node,
-} typedef t_ast_node_cat;
-
-struct t_ast_list_link_ typedef t_ast_list_link;
-
-struct {
-    t_ast_list_link *first;
-    t_ast_list_link *last;
-} typedef t_ast_list;
-
-struct t_ast_list_link_ {
-    t_ast_list_link *next;
-    t_ast_list_link *prev;
-    t_ast_node *p;
-};
-
-struct t_ast_stack_link_ typedef t_ast_stack_link;
-
-struct {
-    t_ast_stack_link *first;
-    t_ast_stack_link *last;
-} typedef t_ast_stack_list;
-
-struct t_ast_stack_link_ {
-    t_ast_stack_link *next;
-    t_ast_stack_link *prev;
-    t_ast_node *p;
-};
-
-
-enum {
-    TYPE_none,
-    TYPE_alias,
-    TYPE_pointer,
-    TYPE_slice,
-    TYPE_function,
-} typedef t_type_cat;
-
-enum {
-    FLAG_is_lvalue=1,
-} typedef t_type_flags;
-
-struct t_type_node_ {
-    t_type_cat cat;
-    t_type_flags flags;
-    union {
-        // aliases
-        t_intern const *name;
-        // pointer, slice
-        t_ast_node *base_type;
-        // functions
-        struct {
-            t_ast_node *parameters;
-            t_ast_node *return_type;
-        };
-    };
-};
-
-enum {
-    op_wtf,
-    UNARY_FIRST_OPERATOR, // no touching
+    UNARY_FIRST,    // no touch
     UNARY_add,
     UNARY_sub,
-    UNARY_deref,
     UNARY_addr,
-    BINARY_FIRST_OPERATOR, // no touching
+    UNARY_deref,
+    BINARY_FIRST,   // no touch
+    BINARY_ass,
     BINARY_add,
     BINARY_sub,
     BINARY_mul,
     BINARY_div,
+    ASS_FIRST,
+    BINARY_add_ass,
+    ARR_ASS_FIRST,
+    BINARY_sub_ass,
+    BINARY_div_ass,
+    BINARY_mul_ass,
+    ASS_LAST,
+    BINARY_and,
+    BINARY_or,
     BINARY_less,
     BINARY_greater,
     BINARY_leq,
     BINARY_geq,
     BINARY_eq,
     BINARY_neq,
-    BINARY_and,
-    BINARY_or,
-    BINARY_FIRST_ASS, // no touching
-    BINARY_ass,
-    BINARY_FIRST_ARITHMETIC_ASS, // no touching
-    BINARY_add_ass,
-    BINARY_sub_ass,
-    BINARY_mul_ass,
-    BINARY_div_ass,
-    BINARY_LAST_ASS, // no touching
     BINARY_function_call,
     BINARY_subscript,
-    TERNARY_FIRST_OPERATOR, // no touching
+    TERNARY_FIRST,
     TERNARY_slice,
-    LAST_OPERATOR, // no touching
-} typedef t_operator_cat;
+    OPERATOR_LAST,
+} typedef f_operation_cat;
 
 enum {
-    EXPR_wtf,
-    EXPR_variable,
-    EXPR_int_value,
-    EXPR_float_value,
-    EXPR_string_value,
-    EXPR_unary_op,
-    EXPR_binary_op,
-    EXPR_ternary_op,
-} typedef t_expr_cat;
-
-typedef struct t_expr_node_ t_expr_node;
-struct t_expr_node_ {
-    t_expr_cat cat;
-    t_ast_node *type;
-    union {
-        // operators
-        struct {
-            t_operator_cat op;
-            t_ast_node *opr1;
-            t_ast_node *opr2;
-            t_ast_node *opr3;
-        };
-        // values
-        i64 ivalue;
-        f64 fvalue;
-        t_intern const *svalue;
-        // ... (TODO: array values &c.)
-        
-        // variable
-        t_intern const *var_name;
-    };
-};
-
-enum {
-    STMT_wtf,
-    STMT_assignment,
+    STMT_invalid,
     STMT_if,
     STMT_while,
-    STMT_return,
     STMT_break,
     STMT_continue,
-    STMT_declaration,
+    STMT_return,
+    STMT_print,
+    STMT_decl,
+    STMT_expr,
     STMT_block,
-    STMT_print, // temporary (? TODO)
-} typedef t_ast_stmt_category;
+} typedef f_stmt_cat;
 
-struct t_stmt_node_ {
-    t_ast_stmt_category cat;
+enum {
+    EXPR_invlaid,
+    EXPR_value,
+    EXPR_identifier,
+    EXPR_unary,
+    EXPR_binary,
+    EXPR_ternary,
+    EXPR_function_call,
+} typedef f_expr_cat;
+
+enum {
+    EXPR_static=1,
+    EXPR_lvalue=2,
+    EXPR_side_effects=4,
+} typedef f_expr_flags;
+
+enum {
+    VALUE_invalid,
+    VALUE_int,
+    VALUE_string,
+    VALUE_float,
+    // TODO(bumbread): for later
+    //VALUE_slice_const,
+    //VALUE_compound_literal,
+} typedef f_value_cat;
+
+enum {
+    TYPE_invlaid,
+    TYPE_int,
+    TYPE_float,
+    TYPE_string,
+    TYPE_bool,
+    TYPE_byte,
+    TYPE_pointer,
+    TYPE_slice,
+    TYPE_function,
+    // TODO(bumbread): for when I'll implement type decls.
+    // TYPE_alias,
+} typedef f_type_cat;
+
+enum {
+    // TODO(bumbread): for when I'll implement type decls
+    //TYPE_distinct=1,
+    //TYPE_const=2,
+} typedef f_type_flags;
+
+enum {
+    DECL_no_value,
+    DECL_expr_value,
+    DECL_block_value,
+} typedef f_decl_value_cat;
+
+// ABSTRACT SYNTAX TREES
+typedef struct t_expr_data_ t_expr_data;
+typedef struct t_stmt_data_ t_stmt_data;
+typedef struct t_type_data_ t_type_data;
+typedef struct t_decl_data_ t_decl_data;
+
+// lists declarations
+
+typedef struct t_expr_list_node_ t_expr_list_node;
+struct t_expr_list_node_ {
+    t_expr_list_node *next;
+    t_expr_list_node *prev;
+    t_expr_data *data;
+};
+
+struct {
+    t_expr_list_node *first;
+    t_expr_list_node *last;
+    i64 count;
+} typedef t_expr_list;
+
+typedef struct t_decl_list_node_ t_decl_list_node;
+struct t_decl_list_node_ {
+    t_decl_list_node *next;
+    t_decl_list_node *prev;
+    t_decl_data *data;
+};
+
+struct {
+    t_decl_list_node *first;
+    t_decl_list_node *last;
+    i64 count;
+} typedef t_decl_list;
+
+typedef struct t_stmt_list_node_ t_stmt_list_node;
+struct t_stmt_list_node_ {
+    t_stmt_list_node *next;
+    t_stmt_list_node *prev;
+    t_stmt_data *data;
+};
+
+struct {
+    t_stmt_list_node *first;
+    t_stmt_list_node *last;
+    i64 count;
+} typedef t_stmt_list;
+
+// expr data
+
+struct {
+    f_value_cat cat;
     union {
-        // assignment
-        struct {
-            // has to be an assignment operator
-            t_operator_cat ass_op;
-            t_ast_node *lvalue;
-            t_ast_node *rvalue;
-        };
-        // declarations
-        struct {
-            t_intern const *decl_name;
-            t_ast_node *decl_type;
-            t_ast_node *decl_value;
-        };
-        // if
-        struct {
-            t_ast_node *if_condition;
-            t_ast_node *if_true_block;
-            t_ast_node *if_false_block;
-        };
-        // while
-        struct {
-            t_ast_node *while_condition;
-            t_ast_node *while_block;
-        };
-        // return, print
-        t_ast_node *stmt_value;
-        // block
-        t_ast_list statements;
+        i64 i;
+        f64 f;
+        t_intern const *s;
+    };
+} typedef t_value_data;
+
+struct {
+    f_operation_cat cat;
+    t_expr_data *expr1;
+    t_expr_data *expr2;
+    t_expr_data *expr3;
+} typedef t_operation_data;
+
+struct {
+    t_expr_data *callee;
+    t_expr_list *parameters;
+} typedef t_function_data;
+
+// type data
+
+// TODO(bumbread): should the parameter be stored as value?
+struct {
+    t_type_data *return_type;
+    t_decl_list *parameters;
+} typedef t_function_type_data;
+
+// stmt data
+
+struct {
+    t_expr_data *condition;
+    t_stmt_data *true_branch;
+    t_stmt_data *false_branch;
+} typedef t_if_data;
+
+struct {
+    t_expr_data *condition;
+    t_stmt_data *block;
+} typedef t_while_data;
+
+struct t_decl_data_ {
+    f_decl_value_cat cat;
+    t_intern const *name;
+    t_type_data *type;
+    union {
+        t_expr_data *value;
+        t_stmt_list *block_data;
     };
 };
 
-struct t_ast_node_ {
-    t_ast_node_cat cat;
+// NODES.
+
+struct t_type_data_ {
+    f_type_cat cat;
+    f_type_flags flags;
     union {
-        t_expr_node expr;
-        t_type_node type;
-        t_stmt_node stmt;
-        t_ast_list list;
+        t_type_data *pointer_base;
+        t_type_data *slice_base;
+        t_function_type_data function_data;
     };
 };
 
-static t_ast_list all_procs;
-static t_ast_node *parser_scope = null;
+struct t_expr_data_ {
+    f_expr_cat cat;
+    f_expr_flags flags;
+    t_type_data *type;
+    union {
+        t_value_data value;
+        t_operation_data operation;
+        t_function_data func;
+        t_intern const *variable;
+    };
+};
+
+struct t_stmt_data_ {
+    f_stmt_cat cat;
+    union {
+        t_while_data while_data;
+        t_if_data if_data;
+        t_decl_data *decl_data;
+        t_expr_data *return_expr;
+        t_expr_data *print_expr;
+        t_expr_data *expr;
+        t_stmt_list block_data;
+    };
+};
+
+static t_decl_list all_procs;
 
 static t_intern const *main_name;
 static t_intern const *result_name;
+static t_intern const *empty_string;
 
-static t_ast_node *type_float;
-static t_ast_node *type_string;
-static t_ast_node *type_bool;
-static t_ast_node *type_int;
-static t_ast_node *type_byte;
-
-static void init_primitive_type(t_ast_node *type, t_intern const *keyword) {
-    type->cat = AST_type_node;
-    type->type.cat = TYPE_alias;
-    type->type.name = keyword;
-}
-
+static t_type_data type_float  = {TYPE_float};
+static t_type_data type_string = {TYPE_string};
+static t_type_data type_bool   = {TYPE_bool};
+static t_type_data type_int    = {TYPE_int};
+static t_type_data type_byte   = {TYPE_byte};
 
 #define KEYWORD_spec \
 KEYWORD_param(keyword_if,       "if")\
@@ -344,12 +378,6 @@ KEYWORD_spec
 #undef KEYWORD_param
 
 
-static t_ast_node *alloc_node(void) {
-    t_ast_node *result = global_alloc(sizeof(t_ast_node));
-    memset(result, 0, sizeof(t_ast_node));
-    return result;
-}
-
 static void init_compiler(void) {
     // intern keywords
 #define KEYWORD_param(var, str) var = intern_cstring(str);
@@ -362,24 +390,13 @@ static void init_compiler(void) {
     
     main_name = intern_cstring("main");
     result_name = intern_cstring("result");
-    
-    type_int = alloc_node();
-    type_bool = alloc_node();
-    type_byte = alloc_node();
-    type_float = alloc_node();
-    type_string = alloc_node();
-    
-    init_primitive_type(type_int, keyword_int);
-    init_primitive_type(type_bool, keyword_bool);
-    init_primitive_type(type_byte, keyword_byte);
-    init_primitive_type(type_float, keyword_float);
-    init_primitive_type(type_string, keyword_string);
+    empty_string = intern_cstring("");
     
     all_procs.first = null;
     all_procs.last = null;
 }
 
-static char const *get_operator_string(t_operator_cat cat) {
+static char const *get_operator_string(f_operation_cat cat) {
     switch(cat) {
         case UNARY_add: return "+";
         case UNARY_sub: return "-";
@@ -409,23 +426,23 @@ static char const *get_operator_string(t_operator_cat cat) {
     return "<invalid unary operation>";
 }
 
-static bool op_is_unary(t_operator_cat cat) {
-    return cat > UNARY_FIRST_OPERATOR && cat < BINARY_FIRST_OPERATOR;
+static bool op_is_unary(f_operation_cat cat) {
+    return cat > UNARY_FIRST && cat < BINARY_FIRST;
 }
 
-static bool op_is_binary(t_operator_cat cat) {
-    return cat > BINARY_FIRST_OPERATOR && cat < TERNARY_FIRST_OPERATOR;
+static bool op_is_binary(f_operation_cat cat) {
+    return cat > BINARY_FIRST && cat < TERNARY_FIRST;
 }
 
-static bool op_is_ternary(t_operator_cat cat) {
-    return cat > TERNARY_FIRST_OPERATOR && cat < LAST_OPERATOR;
+static bool op_is_ternary(f_operation_cat cat) {
+    return cat > TERNARY_FIRST && cat < OPERATOR_LAST;
 }
 
-static bool op_is_assignment(t_operator_cat cat) {
-    return cat > BINARY_FIRST_ASS && cat < BINARY_LAST_ASS;
+static bool op_is_assignment(f_operation_cat cat) {
+    return cat > ASS_FIRST && cat < ASS_LAST;
 }
 
-static bool op_is_arithmetic_assignment(t_operator_cat cat) {
-    return cat > BINARY_FIRST_ARITHMETIC_ASS && cat < BINARY_LAST_ASS;
+static bool op_is_arithmetic_assignment(f_operation_cat cat) {
+    return cat > ARR_ASS_FIRST && cat < ASS_LAST;
 }
 

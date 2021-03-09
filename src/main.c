@@ -14,7 +14,7 @@
 
 #include"compiler_desc.c"
 #include"lexer.c"
-#include"types.c"
+#include"nodes.c"
 #include"parser.c"
 #include"checker.c"
 #include"test.c"
@@ -53,15 +53,14 @@ int main(void) {
     t_lexstate state;
     lex_init(&state, filename, (char *)buf);
     lex_next_token(&state);
-    t_ast_node *code = parse_global_scope(&state);
+    t_decl_list *code = parse_global_scope(&state);
     print_error_buffer();
     if(now_errors == 0) {
         check_code(code);
         print_error_buffer();
     }
     
-    ast_node_print_tree(code, 0);
-    printf("\n\n");
+    //ast_node_print_tree(code, 0);
     
 #if 0
     t_ast_node *code = parse_ast_node_global_level(":int");
@@ -76,5 +75,6 @@ int main(void) {
     print_output(stdout, code);
 #endif
     
+    printf("application terminated successfully");
     return 0;
 }
