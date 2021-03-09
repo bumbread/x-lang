@@ -321,7 +321,7 @@ static t_stmt_data *parse_if_stmt(t_lexstate *state) {
         }
         else {
             false_branch = parse_stmt(state);
-            token_expect_kind(state, ';');
+            //token_expect_kind(state, ';');
         }
     }
     
@@ -449,7 +449,7 @@ static t_stmt_data *parse_return_stmt(t_lexstate *state) {
     token_match_identifier(state, keyword_return);
     t_expr_data *expr = null;
     if(!token_match_kind(state, ';')) {
-        parse_expr(state);
+        expr = parse_expr(state);
     }
     return make_return_stmt(expr);
 }
