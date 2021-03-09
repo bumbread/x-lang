@@ -333,7 +333,9 @@ static void check_function_stmt(t_stmt_data *stmt, t_type_data *function_return_
                                 get_short_type_name(condition->type));
                 }
             }
-            check_function_stmt(stmt->if_data.true_branch, function_return_type);
+            if(stmt->if_data.true_branch != null) {
+                check_function_stmt(stmt->if_data.true_branch, function_return_type);
+            }
             if(stmt->if_data.false_branch != null) {
                 check_function_stmt(stmt->if_data.true_branch, function_return_type);
             }
