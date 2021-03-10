@@ -147,7 +147,7 @@ enum {
 enum {
     EXPR_invlaid,
     EXPR_value,
-    EXPR_identifier,
+    EXPR_variable,
     EXPR_unary,
     EXPR_binary,
     EXPR_ternary,
@@ -305,7 +305,7 @@ struct t_type_data_ {
     union {
         t_type_data *pointer_base;
         t_type_data *slice_base;
-        t_function_type_data function_data;
+        t_function_type_data func;
     };
 };
 
@@ -317,7 +317,7 @@ struct t_expr_data_ {
         t_value_data value;
         t_operation_data operation;
         t_function_data func;
-        t_intern const *variable;
+        t_intern const *var_name;
     };
 };
 

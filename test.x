@@ -1,18 +1,11 @@
 
-:int<-() main {
-  :int x;
-  if x>3 {
-    print x;
-  }
-  else print 2;
-  
-  if x==3;else;
-  if x<3 {
-    return 2;
-  }
-  else {
-    return 34;
-  }
+:int<-(int x) factorial {
+  if x == 0 { return 1; }
+  return x*factorial(x-1);
+}
 
+:int<-() main {
+  :int x = 3;
+  print factorial(10);
   return 0;
 }

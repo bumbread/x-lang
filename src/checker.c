@@ -19,7 +19,7 @@ static void check_type_data(t_type_data *type) {
             check_type_data(type->slice_base);
         }
         case TYPE_function: {
-            t_function_type_data *func = &type->function_data;
+            t_function_type_data *func = &type->func;
             assert(func->return_type != null);
             assert(func->parameters != null);
             check_type_data(func->return_type);
@@ -86,12 +86,12 @@ static t_type_data *get_variable_type(t_intern const *var_name) {
 static void check_derive_expression_type(t_expr_data *expr) {
     assert(expr != null);
     switch(expr->cat) {
-        case EXPR_identifier: {
+        case EXPR_variable: {
             assert(expr->type == null);
-            assert(expr->variable != null);
-            t_type_data *type = get_variable_type(expr->variable);
+            assert(expr->var_name != null);
+            t_type_data *type = get_variable_type(expr->var_name);
             if(type == null) {
-                push_errorf("can not find variable named '%s'", expr->variable->str);
+                push_errorf("can not find variable named '%s'", expr->var_name->str);
             }
             else {
                 expr->flags |= EXPR_lvalue;
@@ -223,7 +223,7 @@ static void check_derive_expression_type(t_expr_data *expr) {
                 break;
             }
             
-            i64 formal_param_count = callee_type->function_data.parameters->count;
+            i64 formal_param_count = callee_type->func.parameters->count;
             i64 actual_param_count = expr->func.parameters->count;
             if(actual_param_count < formal_param_count) {
                 push_errorf("too many actual parameters");
@@ -232,7 +232,7 @@ static void check_derive_expression_type(t_expr_data *expr) {
                 push_errorf("not enough actual parameters");
             }
             else {
-                t_decl_list_node *formal_param_node = callee_type->function_data.parameters->first;
+                t_decl_list_node *formal_param_node = callee_type->func.parameters->first;
                 t_expr_list_node *actual_param_node = expr->func.parameters->first;
                 
                 u64 param_no = 0;
@@ -261,7 +261,7 @@ static void check_derive_expression_type(t_expr_data *expr) {
                     }
                 }
             }
-            expr->type = callee_type->function_data.return_type;
+            expr->type = callee_type->func.return_type;
         } break;
         case EXPR_ternary: {
             assert(op_is_ternary(expr->operation.cat));
@@ -425,9 +425,9 @@ static void check_decl(t_decl_data *decl) {
             t_type_data *type = decl->type;
             stack_list_push_frame(&decls);
             
-            t_decl_data *result_decl = make_decl_no_value(result_name, type->function_data.return_type);
+            t_decl_data *result_decl = make_decl_no_value(result_name, type->func.return_type);
             decl_push(&decls, result_decl);
-            for(t_decl_list_node *param_node = type->function_data.parameters->first;
+            for(t_decl_list_node *param_node = type->func.parameters->first;
                 param_node != null;
                 param_node = param_node->next) {
                 t_decl_data *param = param_node->data;
@@ -437,7 +437,7 @@ static void check_decl(t_decl_data *decl) {
                 }
             }
             
-            check_function_stmts(decl->block_data, type->function_data.return_type);
+            check_function_stmts(decl->block_data, type->func.return_type);
             stack_list_pop_frame(&decls);
         } break;
         case DECL_expr_value: {

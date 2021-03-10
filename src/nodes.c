@@ -182,9 +182,9 @@ static t_expr_data *make_value(void) {
 static t_expr_data *make_identifier_expr(t_intern const *name) {
     assert(name != null);
     t_expr_data *result = make_expr();
-    result->cat = EXPR_identifier;
+    result->cat = EXPR_variable;
     result->flags = 0;
-    result->variable = name;
+    result->var_name = name;
     return result;
 }
 
@@ -259,8 +259,8 @@ static t_type_data *make_type_function(t_type_data *return_type, t_decl_list *pa
     t_type_data *result = make_type();
     result->cat = TYPE_function;
     result->flags = 0;
-    result->function_data.return_type = return_type;
-    result->function_data.parameters = parameters;
+    result->func.return_type = return_type;
+    result->func.parameters = parameters;
     return result;
 }
 
@@ -495,8 +495,8 @@ static bool can_assign_type_to_another(t_type_data *to, t_type_data *from) {
         case TYPE_slice: return can_assign_type_to_another(to->slice_base, from->slice_base);
         case TYPE_pointer: return can_assign_type_to_another(to->pointer_base, from->pointer_base);
         case TYPE_function: {
-            t_function_type_data *to_func = &to->function_data;
-            t_function_type_data *from_func = &from->function_data;
+            t_function_type_data *to_func = &to->func;
+            t_function_type_data *from_func = &from->func;
             if(!can_assign_type_to_another(to_func->return_type, from_func->return_type)) {
                 return false;
             }

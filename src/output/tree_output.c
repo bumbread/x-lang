@@ -13,8 +13,8 @@ static void print_expr(t_expr_data *expr) {
                 printf("%f", expr->value.f);
             }
         } break;
-        case EXPR_identifier: {
-            printf("%s", expr->variable->str);
+        case EXPR_variable: {
+            printf("%s", expr->var_name->str);
         } break;
         case EXPR_unary: {
             printf("(%s ", get_operator_string(expr->operation.cat));
@@ -49,9 +49,8 @@ static void print_expr(t_expr_data *expr) {
         } break;
         case EXPR_function_call: {
             t_function_data *func = &expr->func;
-            printf("call ");
             print_expr(func->callee);
-            printf(" with (");
+            printf("(");
             for(t_expr_list_node *expr_node = func->parameters->first;
                 expr_node != null;
                 expr_node = expr_node->next) {
@@ -91,9 +90,9 @@ static void print_type(t_type_data *type) {
             printf("[]");
         } break;
         case TYPE_function: {
-            print_type(type->function_data.return_type);
+            print_type(type->func.return_type);
             printf("<-(");
-            for(t_decl_list_node *decl_node = type->function_data.parameters->first;
+            for(t_decl_list_node *decl_node = type->func.parameters->first;
                 decl_node != null;
                 decl_node = decl_node->next) {
                 t_decl_data *decl = decl_node->data;
