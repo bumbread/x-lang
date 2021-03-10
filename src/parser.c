@@ -24,31 +24,38 @@ static t_expr_data *parse_expr_value(t_lexstate *state) {
     t_expr_data *node;
     if(token_match_kind(state, '(')) {
         node = parse_expr(state);
-        token_expect_kind(state, ')');
+        if(node == null) {
+            return null;
+        }
+        if(!token_expect_kind(state, ')')) {
+            return null;
+        }
     }
-    else if(state->last_token.kind == TOKEN_str) {
+    else if(token_is_kind(state, TOKEN_str)) {
         node = make_static_value();
         node->cat = EXPR_value;
         node->value.cat = VALUE_string;
         node->value.s = state->last_token.str_value;
         lex_next_token(state);
     }
-    else if(state->last_token.kind == TOKEN_int) {
+    else if(token_is_kind(state, TOKEN_int)) {
         node = make_static_value();
         node->cat = EXPR_value;
         node->value.cat = VALUE_int;
         node->value.i = state->last_token.int_value;
         lex_next_token(state);
     }
-    else if(state->last_token.kind == TOKEN_flt) {
+    else if(token_is_kind(state, TOKEN_flt)) {
         node = make_static_value();
         node->cat = EXPR_value;
         node->value.cat = VALUE_float;
         node->value.f = state->last_token.flt_value;
         lex_next_token(state);
     }
-    else if(state->last_token.kind == TOKEN_idn) {
-        node = make_identifier_expr(state->last_token.str_value);
+    else if(token_is_kind(state, TOKEN_idn)) {
+        t_intern const *identifier_name = state->last_token.str_value;
+        assert(identifier_name != null);
+        node = make_identifier_expr(identifier_name);
         lex_next_token(state);
     }
     else {
@@ -62,11 +69,14 @@ static t_expr_data *parse_expr_value(t_lexstate *state) {
             t_expr_data *expr = parse_expr(state);
             if(expr == null) return null;
             expr_list_push(parameter_list, expr);
-            if(!token_is_kind(state, ')')) {
-                token_match_kind(state, ',');
+            if(!token_is_kind(state, ')') && !token_match_kind(state, ',')) {
+                parse_error("expected either , or )", state->loc);
+                return null;
             }
         }
-        token_expect_kind(state, ')');
+        if(!token_expect_kind(state, ')')) {
+            return null;
+        }
         node = make_function_call(node, parameter_list);
     }
     return node;
@@ -134,7 +144,7 @@ static t_expr_data *parse_expr_term(t_lexstate *state) {
 
 static t_expr_data *parse_expr_factor(t_lexstate *state) {
     t_expr_data *lhs = parse_expr_term(state);
-    if(null == lhs) return null;
+    if(lhs == null) return null;
     while(true) {
         
         if(token_is_kind(state, '*')) {
@@ -269,30 +279,35 @@ static t_stmt_data *parse_expr_stmt(t_lexstate *state) {
     if(token_is_kind(state, TOKEN_add_ass)) {
         lex_next_token(state);
         t_expr_data *rhs = parse_expr(state);
+        if(rhs == null) return null;
         expr = make_binary_expr(BINARY_add_ass, expr, rhs);
     }
     
     else if(token_is_kind(state, TOKEN_sub_ass)) {
         lex_next_token(state);
         t_expr_data *rhs = parse_expr(state);
+        if(rhs == null) return null;
         expr = make_binary_expr(BINARY_sub_ass, expr, rhs);
     }
     
     else if(token_is_kind(state, TOKEN_mul_ass)) {
         lex_next_token(state);
         t_expr_data *rhs = parse_expr(state);
+        if(rhs == null) return null;
         expr = make_binary_expr(BINARY_mul_ass, expr, rhs);
     }
     
     else if(token_is_kind(state, TOKEN_div_ass)) {
         lex_next_token(state);
         t_expr_data *rhs = parse_expr(state);
+        if(rhs == null) return null;
         expr = make_binary_expr(BINARY_div_ass, expr, rhs);
     }
     
     else if(token_is_kind(state, '=')) {
         lex_next_token(state);
         t_expr_data *rhs = parse_expr(state);
+        if(rhs == null) return null;
         expr = make_binary_expr(BINARY_ass, expr, rhs);
     }
     
@@ -318,12 +333,16 @@ static t_stmt_data *parse_if_stmt(t_lexstate *state) {
     if(token_match_identifier(state, keyword_else)) {
         if(token_is_kind(state, '{')) {
             false_branch = parse_stmt_block(state);
+            if(false_branch == null) return null;
         }
         else {
             false_branch = parse_stmt(state);
-            //token_expect_kind(state, ';');
+            if(false_branch == null) return null;
         }
     }
+    
+    if(condition == null) return null;
+    if(true_branch == null) return null;
     
     return make_if_stmt(condition, true_branch, false_branch);
 }
@@ -337,11 +356,13 @@ static t_stmt_data *parse_while_stmt(t_lexstate *state) {
         block = parse_stmt_block(state);
     }
     
+    if(condition == null) return null;
+    if(block == null) return null;
+    
     return make_while_stmt(condition, block);
 }
 
 static t_type_data *parse_type(t_lexstate *state) {
-    
     t_type_data *type = null;
     
     if(token_expect_peek_kind(state, TOKEN_idn)) {
@@ -389,23 +410,19 @@ static t_type_data *parse_type(t_lexstate *state) {
                 return null;
             }
             t_decl_list *decl_list = alloc_decl_list();
-            while(!token_is_kind(state, ')')) {
+            while(!token_match_kind(state, ')')) {
                 t_decl_data *param_decl = parse_declaration(state);
+                if(param_decl == null) return null;
                 decl_list_push(decl_list, param_decl);
                 if(!token_match_kind(state, ',') && !token_is_kind(state, ')')) {
                     parse_error("expected either , or )", state->loc);
                     return null;
                 }
             }
-            if(!token_expect_kind(state, ')')) {
-                return null;
-            }
             type = make_type_function(type, decl_list);
         }
         // end
-        else {
-            break;
-        }
+        else break;
     }
     
     return type;
@@ -416,14 +433,17 @@ static t_decl_data *parse_declaration(t_lexstate *state) {
     t_intern const *name;
     
     if(token_expect_peek_kind(state, TOKEN_idn)) {
-        // TODO(bumbread): maybe this should be handled at the cheker level?
         if(token_is_keyword(&state->last_token)) {
             push_errorf("keywords are not allowed as variable name", state->loc);
+            return null;
         }
         name = state->last_token.str_value;
         lex_next_token(state);
     }
     
+    if(type == null) return null;
+    
+    // TODO(bumbread): if function push to all procs list.
     if(token_match_kind(state, '=')) {
         return make_decl_expr_value(name, type, parse_expr(state));
     }
@@ -433,14 +453,12 @@ static t_decl_data *parse_declaration(t_lexstate *state) {
     else {
         return make_decl_no_value(name, type);
     }
-    
-    // TODO(bumbread): if function push to all procs list.
-    return null;
 }
 
 static t_stmt_data *parse_declaration_stmt(t_lexstate *state) {
     token_expect_kind(state, ':');
     t_decl_data *decl_data = parse_declaration(state);
+    if(decl_data == null) return null;
     t_stmt_data *decl = make_decl_stmt(decl_data);
     return decl;
 }
@@ -450,6 +468,7 @@ static t_stmt_data *parse_return_stmt(t_lexstate *state) {
     t_expr_data *expr = null;
     if(!token_match_kind(state, ';')) {
         expr = parse_expr(state);
+        if(expr == null) return null;
     }
     return make_return_stmt(expr);
 }
@@ -457,19 +476,20 @@ static t_stmt_data *parse_return_stmt(t_lexstate *state) {
 static t_stmt_data *parse_print_stmt(t_lexstate *state) {
     token_match_identifier(state, keyword_print);
     t_expr_data *expr = parse_expr(state);
-    token_expect_kind(state, ';');
+    if(expr == null) return null;
+    if(!token_expect_kind(state, ';')) return null;
     return make_print_stmt(expr);
 }
 
 static t_stmt_data *parse_break_stmt(t_lexstate *state) {
     token_expect_identifier(state, keyword_break);
-    token_expect_kind(state, ';');
+    if(!token_expect_kind(state, ';')) return null;
     return make_stmt_cat(STMT_break);
 }
 
 static t_stmt_data *parse_continue_stmt(t_lexstate *state) {
     token_expect_identifier(state, keyword_continue);
-    token_expect_kind(state, ';');
+    if(!token_expect_kind(state, ';')) return null;
     return make_stmt_cat(STMT_continue);
 }
 
@@ -526,9 +546,8 @@ static t_decl_list *parse_global_scope(t_lexstate *state) {
         t_decl_data *decl = parse_declaration(state);
         if(decl == null) {
             parse_error("unable to parse declaration", state->loc);
-            return decls;
         }
-        decl_list_push(decls, decl);
+        else decl_list_push(decls, decl);
     }
     return decls;
 }
