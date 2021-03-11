@@ -226,10 +226,12 @@ static void check_derive_expression_type(t_expr_data *expr) {
             i64 formal_param_count = callee_type->func.parameters->count;
             i64 actual_param_count = expr->func.parameters->count;
             if(actual_param_count < formal_param_count) {
-                push_errorf("too many actual parameters");
+                push_errorf("too many actual parameters (%lld given, %lld expected)",
+                            actual_param_count, formal_param_count);
             }
             else if(formal_param_count > actual_param_count) {
-                push_errorf("not enough actual parameters");
+                push_errorf("not enough actual parameters (%lld given, %lld expected)",
+                            actual_param_count, formal_param_count);
             }
             else {
                 t_decl_list_node *formal_param_node = callee_type->func.parameters->first;
@@ -265,6 +267,7 @@ static void check_derive_expression_type(t_expr_data *expr) {
         } break;
         case EXPR_ternary: {
             assert(op_is_ternary(expr->operation.cat));
+            assert(expr->operation.expr1 != null);
             
             t_expr_data *op1 = expr->operation.expr1;
             check_derive_expression_type(op1);
@@ -290,7 +293,7 @@ static void check_derive_expression_type(t_expr_data *expr) {
                 push_errorf("first slice index has to be a number");
             }
             if(op2 != null && op2->type->cat != TYPE_int) {
-                push_errorf("first slice index has to be a number");
+                push_errorf("second slice index has to be a number");
             }
             // should hard set it to slice.
             expr->type = op1->type;
@@ -303,24 +306,22 @@ static void check_derive_expression_type(t_expr_data *expr) {
 static bool check_type_compat(t_expr_data *expr, t_type_data *type) {
     assert(expr != null);
     if(expr->type == null) check_derive_expression_type(expr);
-    if(expr->type != null) {
-        if(!can_assign_type_to_another(type, expr->type)) {
-            push_errorf("can not assign %s type to variable of type %s",
-                        get_short_type_name(type), get_short_type_name(expr->type));
-        }
-        return true;
+    assert(expr->type != null);
+    if(!can_assign_type_to_another(type, expr->type)) {
+        return false;
     }
-    return false;
+    return true;
 }
 
 static void check_decl(t_decl_data *decl_node);
 
-static void check_function_stmt(t_stmt_data *stmt, t_type_data *function_return_type) {
+static void check_function_stmt(t_stmt_data *stmt, t_type_data *return_type) {
     assert(stmt != null);
-    assert(function_return_type != null);
+    assert(return_type != null);
     
     switch(stmt->cat) {
         case STMT_expr: {
+            assert(stmt->expr != null);
             check_derive_expression_type(stmt->expr);
         } break;
         case STMT_if: {
@@ -329,15 +330,15 @@ static void check_function_stmt(t_stmt_data *stmt, t_type_data *function_return_
             check_derive_expression_type(condition);
             if(condition->type != null) {
                 if(!is_logical_type(condition->type)) {
-                    push_errorf("the condition in 'if' statement must be a boolean expression. Met %s type",
+                    push_errorf("the condition in 'if' statement must be a logical expression. Met %s type",
                                 get_short_type_name(condition->type));
                 }
             }
             if(stmt->if_data.true_branch != null) {
-                check_function_stmt(stmt->if_data.true_branch, function_return_type);
+                check_function_stmt(stmt->if_data.true_branch, return_type);
             }
             if(stmt->if_data.false_branch != null) {
-                check_function_stmt(stmt->if_data.false_branch, function_return_type);
+                check_function_stmt(stmt->if_data.false_branch, return_type);
             }
         } break;
         case STMT_while: {
@@ -348,12 +349,17 @@ static void check_function_stmt(t_stmt_data *stmt, t_type_data *function_return_
                 push_errorf("the condition in 'while' statement must be a boolean expression. Met %s type",
                             get_short_type_name(condition->type));
             }
-            check_function_stmt(stmt->while_data.block, function_return_type);
+            if(stmt->while_data.block != null) {
+                check_function_stmt(stmt->while_data.block, return_type);
+            }
         } break;
         case STMT_return: {
             if(stmt->return_expr != null) {
                 check_derive_expression_type(stmt->return_expr);
-                check_type_compat(stmt->return_expr, function_return_type);
+                if(!check_type_compat(stmt->return_expr, return_type)) {
+                    push_errorf("can not assign %s type to variable of type %s",
+                                get_short_type_name(stmt->return_expr->type), get_short_type_name(return_type));
+                }
             }
         } break;
         case STMT_break:    break; // what?
@@ -366,7 +372,7 @@ static void check_function_stmt(t_stmt_data *stmt, t_type_data *function_return_
             for(t_stmt_list_node *stmt_node = stmt->block_data.first;
                 stmt_node != null;
                 stmt_node = stmt_node->next) {
-                check_function_stmt(stmt_node->data, function_return_type);
+                check_function_stmt(stmt_node->data, return_type);
             }
             stack_list_pop_frame(&decls);
         } break;
@@ -377,26 +383,20 @@ static void check_function_stmt(t_stmt_data *stmt, t_type_data *function_return_
     }
 }
 
-static void check_function_stmts(t_stmt_list *block, t_type_data *type) {
+static void check_function_stmts(t_stmt_list *block, t_type_data *return_type) {
+    assert(block != null);
+    assert(return_type != null);
     for(t_stmt_list_node *stmt_node = block->first;
         stmt_node != null;
         stmt_node = stmt_node->next) {
         t_stmt_data *stmt = stmt_node->data;
-        check_function_stmt(stmt, type);
-        
-        if(stmt->cat == STMT_return) {
-            t_expr_data *return_value = stmt->return_expr;
-            if(return_value != null) {
-                if(!can_assign_type_to_another(type, return_value->type)) {
-                    push_errorf("return value of %s type is incompatible with function return of %s type",
-                                get_short_type_name(return_value->type), get_short_type_name(type));
-                }
-            }
-        }
+        assert(stmt != null);
+        check_function_stmt(stmt, return_type);
     }
 }
 
-static void check_decl(t_decl_data *decl) {
+static void check_function_param_decl(t_decl_data *decl) {
+    assert(decl != null);
     assert(decl->name != null);
     assert(decl->type != null);
     
@@ -408,7 +408,29 @@ static void check_decl(t_decl_data *decl) {
         t_decl_data *prev_decl = prev_decl_node->data;
         if(prev_decl->name == decl->name) {
             // TODO(bumbread): token id.
-            push_errorf("'%s' is already declared", decl->name->str);
+            push_errorf("variable with name '%s' is already declared", decl->name->str);
+            break;
+        }
+    }
+    
+    decl_push(&decls, decl);
+    check_type_data(decl->type);
+}
+
+static void check_decl(t_decl_data *decl) {
+    assert(decl != null);
+    assert(decl->name != null);
+    assert(decl->type != null);
+    
+    for(t_decl_stack_node *prev_decl_node = decls.first;
+        prev_decl_node != null;
+        prev_decl_node = prev_decl_node->next) {
+        if(prev_decl_node->data == null) continue;
+        
+        t_decl_data *prev_decl = prev_decl_node->data;
+        if(prev_decl->name == decl->name) {
+            // TODO(bumbread): token id.
+            push_errorf("variable with name '%s' is already declared", decl->name->str);
             break;
         }
     }
@@ -423,18 +445,27 @@ static void check_decl(t_decl_data *decl) {
                 return;
             }
             t_type_data *type = decl->type;
-            stack_list_push_frame(&decls);
+            assert(type->func.return_type != null);
             
+            // implicit `result` variable in function bodies
+            stack_list_push_frame(&decls);
             t_decl_data *result_decl = make_decl_no_value(result_name, type->func.return_type);
             decl_push(&decls, result_decl);
+            
+            i64 param_index = 0;
             for(t_decl_list_node *param_node = type->func.parameters->first;
                 param_node != null;
                 param_node = param_node->next) {
                 t_decl_data *param = param_node->data;
                 assert(param != null);
-                if(param->name != null) { // TODO(bumbread): require names?
+                if(param->name != null) {
+                    check_function_param_decl(param);
                     decl_push(&decls, param);
                 }
+                else {
+                    push_errorf("function parameter #%d has to be named", param_index);
+                }
+                param_index += 1;
             }
             
             check_function_stmts(decl->block_data, type->func.return_type);
@@ -442,7 +473,10 @@ static void check_decl(t_decl_data *decl) {
         } break;
         case DECL_expr_value: {
             t_expr_data *value = decl->value;
-            check_type_compat(decl->value, decl->type);
+            if(!check_type_compat(decl->value, decl->type)) {
+                push_errorf("can not assign %s type to variable of type %s",
+                            get_short_type_name(value->type), get_short_type_name(decl->type));
+            }
         } break;
         case DECL_no_value: {} break;
         default: assert(false);
