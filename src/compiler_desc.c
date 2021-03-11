@@ -313,6 +313,7 @@ struct t_expr_data_ {
     f_expr_cat cat;
     f_expr_flags flags;
     t_type_data *type;
+    t_location loc;
     union {
         t_value_data value;
         t_operation_data operation;
@@ -323,6 +324,7 @@ struct t_expr_data_ {
 
 struct t_stmt_data_ {
     f_stmt_cat cat;
+    t_location loc;
     union {
         t_while_data while_data;
         t_if_data if_data;
@@ -339,12 +341,6 @@ static t_decl_list all_procs;
 static t_intern const *main_name;
 static t_intern const *result_name;
 static t_intern const *empty_string;
-
-static t_type_data type_float  = {TYPE_float};
-static t_type_data type_string = {TYPE_string};
-static t_type_data type_bool   = {TYPE_bool};
-static t_type_data type_int    = {TYPE_int};
-static t_type_data type_byte   = {TYPE_byte};
 
 #define KEYWORD_spec \
 KEYWORD_param(keyword_if,       "if")\

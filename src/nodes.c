@@ -1,3 +1,8 @@
+// LOCATION
+
+static t_location null_location = {0};
+
+
 // LISTS
 
 static t_expr_list *alloc_expr_list(void) {
@@ -165,32 +170,66 @@ static t_decl_data *make_decl(void) {
     return result;
 }
 
-static t_expr_data *make_static_value(void) {
+static t_expr_data *make_static_value(t_location loc) {
     t_expr_data *result = make_expr();
+    result->loc = loc;
     result->cat = EXPR_value;
     result->flags = EXPR_static;
     return result;
 }
 
-static t_expr_data *make_value(void) {
+static t_type_data *make_int_type(void) {
+    t_type_data *result = make_type();
+    result->cat = TYPE_int;
+    return result;
+}
+
+static t_type_data *make_float_type(void) {
+    t_type_data *result = make_type();
+    result->cat = TYPE_float;
+    return result;
+}
+
+static t_type_data *make_byte_type(void) {
+    t_type_data *result = make_type();
+    result->cat = TYPE_byte;
+    return result;
+}
+
+static t_type_data *make_bool_type(void) {
+    t_type_data *result = make_type();
+    result->cat = TYPE_bool;
+    return result;
+}
+
+static t_type_data *make_string_type(void) {
+    t_type_data *result = make_type();
+    result->cat = TYPE_string;
+    return result;
+}
+
+static t_expr_data *make_value(t_location loc) {
     t_expr_data *result = make_expr();
+    result->loc = loc;
     result->cat = EXPR_value;
     result->flags = 0;
     return result;
 }
 
-static t_expr_data *make_identifier_expr(t_intern const *name) {
+static t_expr_data *make_identifier_expr(t_intern const *name, t_location loc) {
     assert(name != null);
     t_expr_data *result = make_expr();
+    result->loc = loc;
     result->cat = EXPR_variable;
     result->flags = 0;
     result->var_name = name;
     return result;
 }
 
-static t_expr_data *make_unary_expr(f_operation_cat op, t_expr_data *expr) {
+static t_expr_data *make_unary_expr(f_operation_cat op, t_expr_data *expr, t_location loc) {
     assert(op_is_unary(op));
     t_expr_data *result = make_expr();
+    result->loc = loc;
     result->cat = EXPR_unary;
     result->flags = 0;
     result->operation.cat = op;
@@ -200,9 +239,11 @@ static t_expr_data *make_unary_expr(f_operation_cat op, t_expr_data *expr) {
 
 static t_expr_data *make_binary_expr(f_operation_cat op,
                                      t_expr_data *expr1,
-                                     t_expr_data *expr2) {
+                                     t_expr_data *expr2,
+                                     t_location loc) {
     assert(op_is_binary(op));
     t_expr_data *result = make_expr();
+    result->loc = loc;
     result->cat = EXPR_binary;
     result->flags = 0;
     result->operation.cat = op;
@@ -214,9 +255,11 @@ static t_expr_data *make_binary_expr(f_operation_cat op,
 static t_expr_data *make_ternary_expr(f_operation_cat op,
                                       t_expr_data *expr1,
                                       t_expr_data *expr2,
-                                      t_expr_data *expr3) {
+                                      t_expr_data *expr3,
+                                      t_location loc) {
     assert(op_is_ternary(op));
     t_expr_data *result = make_expr();
+    result->loc = loc;
     result->cat = EXPR_ternary;
     result->flags = 0;
     result->operation.cat = op;
@@ -226,9 +269,12 @@ static t_expr_data *make_ternary_expr(f_operation_cat op,
     return result;
 }
 
-static t_expr_data *make_function_call(t_expr_data *callee, t_expr_list *parameters) {
+static t_expr_data *make_function_call(t_expr_data *callee,
+                                       t_expr_list *parameters,
+                                       t_location loc) {
     assert(callee != null);
     t_expr_data *result = make_expr();
+    result->loc = loc;
     result->cat = EXPR_function_call;
     result->flags = 0;
     result->func.callee = callee;
@@ -239,7 +285,6 @@ static t_expr_data *make_function_call(t_expr_data *callee, t_expr_list *paramet
 static t_type_data *make_type_pointer_to(t_type_data *type) {
     assert(type != null);
     t_type_data *result = make_type();
-    result->cat = TYPE_pointer;
     result->flags = 0;
     result->pointer_base = type;
     return result;
@@ -254,7 +299,8 @@ static t_type_data *make_type_slice_of(t_type_data *type) {
     return result;
 }
 
-static t_type_data *make_type_function(t_type_data *return_type, t_decl_list *parameters) {
+static t_type_data *make_type_function(t_type_data *return_type,
+                                       t_decl_list *parameters) {
     assert(return_type != null);
     t_type_data *result = make_type();
     result->cat = TYPE_function;
@@ -266,9 +312,11 @@ static t_type_data *make_type_function(t_type_data *return_type, t_decl_list *pa
 
 static t_stmt_data *make_if_stmt(t_expr_data *condition,
                                  t_stmt_data *true_branch,
-                                 t_stmt_data *opt_false_branch) {
+                                 t_stmt_data *opt_false_branch,
+                                 t_location loc) {
     assert(condition != null);
     t_stmt_data *result = make_stmt();
+    result->loc = loc;
     result->cat = STMT_if;
     result->if_data.condition = condition;
     result->if_data.true_branch = true_branch;
@@ -277,7 +325,8 @@ static t_stmt_data *make_if_stmt(t_expr_data *condition,
 }
 
 static t_stmt_data *make_while_stmt(t_expr_data *condition,
-                                    t_stmt_data *block) {
+                                    t_stmt_data *block,
+                                    t_location loc) {
     assert(condition != null);
     t_stmt_data *result = make_stmt();
     result->cat = STMT_while;
@@ -286,7 +335,7 @@ static t_stmt_data *make_while_stmt(t_expr_data *condition,
     return result;
 }
 
-static t_stmt_data *make_expression_stmt(t_expr_data *expr) {
+static t_stmt_data *make_expression_stmt(t_expr_data *expr, t_location loc) {
     assert(expr != null);
     t_stmt_data *result = make_stmt();
     result->cat = STMT_expr;
@@ -294,7 +343,7 @@ static t_stmt_data *make_expression_stmt(t_expr_data *expr) {
     return result;
 }
 
-static t_stmt_data *make_decl_stmt(t_decl_data *decl) {
+static t_stmt_data *make_decl_stmt(t_decl_data *decl, t_location loc) {
     assert(decl != null);
     t_stmt_data *result = make_stmt();
     result->cat = STMT_decl;
@@ -302,27 +351,27 @@ static t_stmt_data *make_decl_stmt(t_decl_data *decl) {
     return result;
 }
 
-static t_stmt_data *make_return_stmt(t_expr_data *expr) {
+static t_stmt_data *make_return_stmt(t_expr_data *expr, t_location loc) {
     t_stmt_data *result = make_stmt();
     result->cat = STMT_return;
     result->return_expr = expr;
     return result;
 }
 
-static t_stmt_data *make_print_stmt(t_expr_data *expr) {
+static t_stmt_data *make_print_stmt(t_expr_data *expr, t_location loc) {
     t_stmt_data *result = make_stmt();
     result->cat = STMT_print;
     result->print_expr = expr;
     return result;
 }
 
-static t_stmt_data *make_stmt_cat(f_stmt_cat cat) {
+static t_stmt_data *make_stmt_cat(f_stmt_cat cat, t_location loc) {
     t_stmt_data *result = make_stmt();
     result->cat = cat;
     return result;
 }
 
-static t_stmt_data *make_stmt_block(void) {
+static t_stmt_data *make_stmt_block(t_location loc) {
     t_stmt_data *result = make_stmt();
     result->cat = STMT_block;
     result->block_data.first = null;
@@ -366,42 +415,43 @@ static t_decl_data *make_decl_expr_value(t_intern const *name, t_type_data *type
     return result;
 }
 
-static t_expr_data *get_null_or_default_value_for_type(t_type_data *type) {
+static t_expr_data *__get_null_or_default_value_for_type(t_type_data *type) {
+    
     assert(type != null);
     switch(type->cat) {
         case TYPE_bool: {
-            t_expr_data *result = make_static_value();
-            result->type = &type_bool;
+            t_expr_data *result = make_static_value(null_location);
+            result->type = make_bool_type();
             result->value.cat = VALUE_int;
             result->value.i = 0;
         } break;
         case TYPE_byte: {
-            t_expr_data *result = make_static_value();
-            result->type = &type_byte;
+            t_expr_data *result = make_static_value(null_location);
+            result->type = make_byte_type();
             result->value.cat = VALUE_int;
             result->value.i = 0;
         } break;
         case TYPE_int: {
-            t_expr_data *result = make_static_value();
-            result->type = &type_int;
+            t_expr_data *result = make_static_value(null_location);
+            result->type = make_int_type();
             result->value.cat = VALUE_int;
             result->value.i = 0;
         } break;
         case TYPE_float: {
-            t_expr_data *result = make_static_value();
-            result->type = &type_float;
+            t_expr_data *result = make_static_value(null_location);
+            result->type = make_float_type();
             result->value.cat = VALUE_float;
             result->value.f = 0.0f;
         } break;
         case TYPE_string: {
-            t_expr_data *result = make_static_value();
-            result->type = &type_string;
+            t_expr_data *result = make_static_value(null_location);
+            result->type = make_string_type();
             result->value.cat = VALUE_string;
             result->value.s = empty_string;
         } break;
         case TYPE_pointer: {
-            t_expr_data *result = make_static_value();
-            result->type = type;
+            t_expr_data *result = make_static_value(null_location);
+            result->type = 0;
             result->value.cat = VALUE_int;
             result->value.i = 0;
         } break;

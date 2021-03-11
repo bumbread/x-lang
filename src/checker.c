@@ -71,9 +71,6 @@ static t_decl_data *get_decl_by_name(t_intern const *var_name) {
 }
 
 static t_type_data *get_variable_type(t_intern const *var_name) {
-    if(var_name == keyword_true || var_name == keyword_false) {
-        return &type_bool;
-    }
     t_decl_data *decl = get_decl_by_name_noerr(var_name);
     if(decl != null) {
         assert(decl->name = var_name);
@@ -104,9 +101,9 @@ static void check_derive_expression_type(t_expr_data *expr) {
             
             expr->flags |= EXPR_static;
             switch(expr->value.cat) {
-                case VALUE_int: expr->type = &type_int; break;
-                case VALUE_string: expr->type = &type_string; break;
-                case VALUE_float: expr->type = &type_float; break;
+                case VALUE_int: expr->type = make_int_type(); break;
+                case VALUE_string: expr->type = make_string_type(); break;
+                case VALUE_float: expr->type = make_float_type(); break;
                 default: assert(false);
             }
             
@@ -168,7 +165,7 @@ static void check_derive_expression_type(t_expr_data *expr) {
                         push_errorf("can not compare %s type to %s type",
                                     get_short_type_name(op1->type), get_short_type_name(op2->type));
                     }
-                    expr->type = &type_bool;
+                    expr->type = make_bool_type();
                 } break;
                 case BINARY_eq:
                 case BINARY_neq: {
@@ -176,21 +173,21 @@ static void check_derive_expression_type(t_expr_data *expr) {
                         push_errorf("can not compare %s type to %s type",
                                     get_short_type_name(op1->type), get_short_type_name(op2->type));
                     }
-                    expr->type = &type_bool;
+                    expr->type = make_bool_type();
                 } break;
                 case BINARY_and: {
                     if(!are_types_logical(op1->type, op2->type)) {
                         push_errorf("operation AND is not available for %s type and %s type",
                                     get_short_type_name(op1->type), get_short_type_name(op2->type));
                     }
-                    expr->type = &type_bool;
+                    expr->type = make_bool_type();
                 } break;
                 case BINARY_or: {
                     if(!are_types_logical(op1->type, op2->type)) {
                         push_errorf("operation OR is not available for %s type and %s type",
                                     get_short_type_name(op1->type), get_short_type_name(op2->type));
                     }
-                    expr->type = &type_bool;
+                    expr->type = make_bool_type();
                 }
                 case BINARY_subscript: {
                     if(!can_subscript_type(op1->type)) {
@@ -198,7 +195,7 @@ static void check_derive_expression_type(t_expr_data *expr) {
                         break;
                     }
                     if(op1->type->cat == TYPE_string) {
-                        expr->type = &type_byte;
+                        expr->type = make_bool_type();
                     }
                     else if(op1->type->cat == TYPE_slice) {
                         expr->type = op1->type->slice_base;
