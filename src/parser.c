@@ -461,10 +461,14 @@ static t_decl_data *parse_declaration(t_lexstate *state) {
     
     // TODO(bumbread): if function push to all procs list.
     if(token_match_kind(state, '=')) {
-        return make_decl_expr_value(name, type, parse_expr(state));
+        t_expr_data *expr = parse_expr(state);
+        if(expr == null) return null;
+        return make_decl_expr_value(name, type, expr);
     }
     else if(token_is_kind(state, '{')) {
-        return make_decl_block_value(name, type, parse_stmt_list(state));
+        t_stmt_list *stmt_list = parse_stmt_list(state);
+        if(stmt_list == null) return null;
+        return make_decl_block_value(name, type, stmt_list);
     }
     else {
         return make_decl_no_value(name, type);
@@ -487,6 +491,9 @@ static t_stmt_data *parse_return_stmt(t_lexstate *state) {
     if(!token_match_kind(state, ';')) {
         expr = parse_expr(state);
         if(expr == null) return null;
+        if(!token_match_kind(state, ';')) {
+            return null;
+        }
     }
     return make_return_stmt(expr, stmt_start);
 }
@@ -537,6 +544,14 @@ static t_stmt_list *parse_stmt_list(t_lexstate *state) {
         if(stmt != null) {
             stmt_list_push(list, stmt);
         }
+        else {
+            while(!token_match_kind(state, ';')) {
+                lex_next_token(state);
+                if(token_is_kind(state, TOKEN_eof)) {
+                    break;
+                }
+            }
+        }
     }
     if(!token_expect_kind(state, '}')) {
         return null;
@@ -553,6 +568,14 @@ static t_stmt_data *parse_stmt_block(t_lexstate *state) {
         t_stmt_data *stmt = parse_stmt(state);
         if(stmt != null) {
             block_append_stmt(block, stmt);
+        }
+        else {
+            while(!token_match_kind(state, ';')) {
+                lex_next_token(state);
+                if(token_is_kind(state, TOKEN_eof)) {
+                    break;
+                }
+            }
         }
     }
     if(!token_expect_kind(state, '}')) {
