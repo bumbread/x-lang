@@ -489,7 +489,8 @@ static void check_decl(t_token_location at, t_decl_data *decl) {
                 return;
             }
             if(!check_type_compat(value, decl->type)) {
-                push_errorf(at, "can not assign %s type to variable of type %s",
+                push_errorf(at, "can not initialize variable '%s' (%s type) to value of type %s",
+                            decl->name->str,
                             get_short_type_name(value->type), get_short_type_name(decl->type));
             }
         } break;

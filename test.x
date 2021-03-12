@@ -1,4 +1,4 @@
 :int<-() main {
-  :int x = 3<1;
+  :int x = 3<2;
   return x;
 }
