@@ -24,7 +24,7 @@ static inline char const lex_next_char(t_lexstate *state) {
     state->loc.offset += 1;
     if(result == '\n') {
         state->loc.line += 1;
-        state->loc.offset = 0;
+        state->loc.offset = 1;
     }
     return result;
 }
