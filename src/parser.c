@@ -474,6 +474,10 @@ static t_stmt_data *parse_declaration_stmt(t_lexstate *state) {
     token_expect_kind(state, ':');
     t_decl_data *decl_data = parse_declaration(state);
     if(decl_data == null) return null;
+    if(decl_data->cat == DECL_expr_value || decl_data->cat == DECL_no_value) {
+        if(!token_expect_kind(state, ';')) return null;
+    }
+    else token_match_kind(state, ';');
     t_stmt_data *decl = make_decl_stmt(decl_data, stmt_start);
     return decl;
 }
