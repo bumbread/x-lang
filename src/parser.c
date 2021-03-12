@@ -1,11 +1,11 @@
 
 static inline bool unexpected_last_token(t_lexstate *state) {
-    push_errorf(state->loc, "unexpected token %s.", get_token_string(&state->last_token));
+    push_errorf(state->last_token.loc, "unexpected token %s.", get_token_string(&state->last_token));
     return false;
 }
 
 static inline void parse_error(t_lexstate *state, char const *string) {
-    push_errorf(state->loc, "%s", string);
+    push_errorf(state->last_token.loc, "%s", string);
 }
 
 //--------------------||
@@ -15,7 +15,7 @@ static inline void parse_error(t_lexstate *state, char const *string) {
 static t_expr_data *parse_expr(t_lexstate *state);
 
 static t_expr_data *parse_expr_value(t_lexstate *state) {
-    t_location expr_start = state->loc;
+    t_location expr_start = state->last_token.loc;
     t_expr_data *node;
     if(token_match_kind(state, '(')) {
         node = parse_expr(state);
@@ -78,7 +78,7 @@ static t_expr_data *parse_expr_value(t_lexstate *state) {
 }
 
 static t_expr_data *parse_expr_term(t_lexstate *state) {
-    t_location expr_start = state->loc;
+    t_location expr_start = state->last_token.loc;
     
     // sub
     if(token_match_kind(state, '-')) {
@@ -144,7 +144,7 @@ static t_expr_data *parse_expr_factor(t_lexstate *state) {
     if(lhs == null) return null;
     while(true) {
         
-        t_location sign_start = state->loc;
+        t_location sign_start = state->last_token.loc;
         if(token_is_kind(state, '*')) {
             lex_next_token(state);
             t_expr_data *rhs = parse_expr_term(state);
@@ -167,7 +167,7 @@ static t_expr_data *parse_expr_arithmetic(t_lexstate *state) {
     t_expr_data *lhs = parse_expr_factor(state);
     if(lhs != null) {
         while(true) {
-            t_location sign_start = state->loc;
+            t_location sign_start = state->last_token.loc;
             
             if(token_is_kind(state, '+')) {
                 lex_next_token(state);
@@ -193,7 +193,7 @@ static t_expr_data *parse_expr_relational(t_lexstate *state) {
     t_expr_data *lhs = parse_expr_arithmetic(state);
     if(lhs == null) return null;
     while(true) {
-        t_location sign_start = state->loc;
+        t_location sign_start = state->last_token.loc;
         
         if(token_is_kind(state, '<')) {
             lex_next_token(state);
@@ -246,7 +246,7 @@ static t_expr_data *parse_expr_and_level(t_lexstate *state) {
     if(lhs == null) return null;
     
     while(token_is_identifier(state, keyword_and)) {
-        t_location and_op_location = state->loc;
+        t_location and_op_location = state->last_token.loc;
         lex_next_token(state);
         t_expr_data *rhs = parse_expr_relational(state);
         if(rhs == null) return null;
@@ -259,7 +259,7 @@ static t_expr_data *parse_expr_or_level(t_lexstate *state) {
     t_expr_data *lhs = parse_expr_and_level(state);
     if(lhs == null) return null;
     while(token_is_identifier(state, keyword_or)) {
-        t_location or_op_location = state->loc;
+        t_location or_op_location = state->last_token.loc;
         lex_next_token(state);
         t_expr_data *rhs = parse_expr_and_level(state);
         if(rhs == null) return null;
@@ -276,12 +276,12 @@ static t_expr_data *parse_expr(t_lexstate *state) {
 
 
 static t_stmt_data *parse_expr_stmt(t_lexstate *state) {
-    t_location stmt_start = state->loc;
+    t_location stmt_start = state->last_token.loc;
     
     t_expr_data *expr = parse_expr(state);
     if(expr == null) return null;
     
-    t_location op_loc = state->loc;
+    t_location op_loc = state->last_token.loc;
     if(token_is_kind(state, TOKEN_add_ass)) {
         lex_next_token(state);
         t_expr_data *rhs = parse_expr(state);
@@ -327,7 +327,7 @@ static t_stmt_data *parse_stmt(t_lexstate *state);
 static t_decl_data *parse_declaration(t_lexstate *state);
 
 static t_stmt_data *parse_if_stmt(t_lexstate *state) {
-    t_location statement_start = state->loc;
+    t_location statement_start = state->last_token.loc;
     
     token_expect_identifier(state, keyword_if);
     t_expr_data *condition = parse_expr(state);
@@ -356,7 +356,7 @@ static t_stmt_data *parse_if_stmt(t_lexstate *state) {
 }
 
 static t_stmt_data *parse_while_stmt(t_lexstate *state) {
-    t_location statement_start = state->loc;
+    t_location statement_start = state->last_token.loc;
     
     token_expect_identifier(state, keyword_while);
     t_expr_data *condition = parse_expr(state);
@@ -444,7 +444,7 @@ static t_decl_data *parse_declaration(t_lexstate *state) {
     
     if(token_expect_peek_kind(state, TOKEN_idn)) {
         if(token_is_keyword(&state->last_token)) {
-            push_errorf(state->loc, "keywords are not allowed as variable name");
+            push_errorf(state->last_token.loc, "keywords are not allowed as variable name");
             return null;
         }
         name = state->last_token.str_value;
@@ -470,7 +470,7 @@ static t_decl_data *parse_declaration(t_lexstate *state) {
 }
 
 static t_stmt_data *parse_declaration_stmt(t_lexstate *state) {
-    t_location stmt_start = state->loc;
+    t_location stmt_start = state->last_token.loc;
     token_expect_kind(state, ':');
     t_decl_data *decl_data = parse_declaration(state);
     if(decl_data == null) return null;
@@ -479,7 +479,7 @@ static t_stmt_data *parse_declaration_stmt(t_lexstate *state) {
 }
 
 static t_stmt_data *parse_return_stmt(t_lexstate *state) {
-    t_location stmt_start = state->loc;
+    t_location stmt_start = state->last_token.loc;
     token_match_identifier(state, keyword_return);
     t_expr_data *expr = null;
     if(!token_match_kind(state, ';')) {
@@ -493,7 +493,7 @@ static t_stmt_data *parse_return_stmt(t_lexstate *state) {
 }
 
 static t_stmt_data *parse_print_stmt(t_lexstate *state) {
-    t_location stmt_start = state->loc;
+    t_location stmt_start = state->last_token.loc;
     token_match_identifier(state, keyword_print);
     t_expr_data *expr = parse_expr(state);
     if(expr == null) return null;
@@ -502,14 +502,14 @@ static t_stmt_data *parse_print_stmt(t_lexstate *state) {
 }
 
 static t_stmt_data *parse_break_stmt(t_lexstate *state) {
-    t_location stmt_start = state->loc;
+    t_location stmt_start = state->last_token.loc;
     token_expect_identifier(state, keyword_break);
     if(!token_expect_kind(state, ';')) return null;
     return make_stmt_cat(STMT_break, stmt_start);
 }
 
 static t_stmt_data *parse_continue_stmt(t_lexstate *state) {
-    t_location stmt_start = state->loc;
+    t_location stmt_start = state->last_token.loc;
     token_expect_identifier(state, keyword_continue);
     if(!token_expect_kind(state, ';')) return null;
     return make_stmt_cat(STMT_continue, stmt_start);
@@ -554,7 +554,7 @@ static t_stmt_list *parse_stmt_list(t_lexstate *state) {
 }
 
 static t_stmt_data *parse_stmt_block(t_lexstate *state) {
-    t_location block_start = state->loc;
+    t_location block_start = state->last_token.loc;
     if(!token_expect_kind(state, '{')) return null;
     
     t_stmt_data *block = make_stmt_block(block_start);

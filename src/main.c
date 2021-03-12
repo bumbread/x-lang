@@ -27,8 +27,8 @@ int main(void) {
     init_error_buffer(20);
     string_builder_init();
     
-    test_lexing();
-    test_interns();
+    //test_lexing();
+    //test_interns();
     
     init_interns(malloc);
     init_compiler();

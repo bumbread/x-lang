@@ -1,17 +1,15 @@
 
 struct {
-    char const *filename;
     char const *stream;
     t_token last_token;
-    t_location loc;
+    t_location _loc;
 } typedef t_lexstate;
 
 static void lex_init(t_lexstate *state, char const *filename, char const *stream) {
-    state->filename = filename;
     state->stream = stream;
-    state->loc.line = 1;
-    state->loc.offset = 1;
-    state->loc.filename = filename;
+    state->_loc.line = 1;
+    state->_loc.offset = 1;
+    state->_loc.filename = filename;
     t_token eof_token; // to be removed later
     eof_token.start = eof_token.end = null;
     eof_token.kind = TOKEN_eof;
@@ -21,10 +19,13 @@ static void lex_init(t_lexstate *state, char const *filename, char const *stream
 static inline char const lex_next_char(t_lexstate *state) {
     char result = *state->stream;
     state->stream += 1;
-    state->loc.offset += 1;
-    if(result == '\n') {
-        state->loc.line += 1;
-        state->loc.offset = 1;
+    state->_loc.offset += 1;
+    if(result == '\r') {
+        state->_loc.offset = 1;
+    }
+    else if(result == '\n') {
+        state->_loc.line += 1;
+        state->_loc.offset = 1;
     }
     return result;
 }
@@ -67,6 +68,7 @@ static void lex_next_token(t_lexstate *state) {
     
     char const *start = state->stream;
     state->last_token.flags = 0;
+    state->last_token.loc = state->_loc;
     
     // lex identifiers
     if(isalpha(*state->stream) || *state->stream == '_') {
@@ -116,7 +118,7 @@ static void lex_next_token(t_lexstate *state) {
         if(lex_match_char(state, '\\')) {
             val = lex_string_escape(state->stream, &state->stream);
             if(val > 0xff) {
-                push_errorf(state->loc, "value %x is unacceptable for a char literal", val);
+                push_errorf(state->_loc, "value %x is unacceptable for a char literal", val);
             }
         }
         else if(isprint(*state->stream)) {
@@ -124,13 +126,13 @@ static void lex_next_token(t_lexstate *state) {
             state->stream += 1;
         }
         else {
-            push_errorf(state->loc, "value %x is unacceptable for a char literal", *state->stream);
+            push_errorf(state->_loc, "value %x is unacceptable for a char literal", *state->stream);
         }
         state->last_token.kind = TOKEN_int;
         //state->last_token.subkind = SUBKIND_char;
         state->last_token.int_value = val;
         if(!lex_match_char(state, '\'')) {
-            push_errorf(state->loc, "expected a char literal to close");
+            push_errorf(state->_loc, "expected a char literal to close");
         }
     }
     else if(lex_match_char(state, '"')) { // string literal
@@ -141,7 +143,7 @@ static void lex_next_token(t_lexstate *state) {
             else if(lex_match_char(state, '\\')) {
                 i64 val = lex_string_escape(state->stream, &state->stream);
                 if(val > 0xff) {
-                    push_errorf(state->loc, "value %x is unacceptable for a hex escape", val);
+                    push_errorf(state->_loc, "value %x is unacceptable for a hex escape", val);
                 }
                 string_builder_append_char((char)val);
             }
@@ -218,7 +220,6 @@ static void lex_next_token(t_lexstate *state) {
     char const *end = state->stream;
     state->last_token.start = start;
     state->last_token.end = end;
-    state->last_token.loc = state->loc;
 }
 
 static inline bool token_is_keyword(t_token *token) {
@@ -242,7 +243,7 @@ static inline bool token_expect_kind(t_lexstate *state, t_token_kind kind) {
         lex_next_token(state);
         return true;
     }
-    push_errorf(state->loc, "expected token %s, got %s",
+    push_errorf(state->last_token.loc, "expected token %s, got %s",
                 get_token_kind_name(kind),
                 get_token_string(&state->last_token));
     return false;
@@ -252,7 +253,7 @@ static inline bool token_expect_peek_kind(t_lexstate *state, t_token_kind kind) 
     if(state->last_token.kind == kind) {
         return true;
     }
-    push_errorf(state->loc, "expected token %s, got %s",
+    push_errorf(state->last_token.loc, "expected token %s, got %s",
                 get_token_kind_name(kind),
                 get_token_string(&state->last_token));
     return false;
@@ -279,7 +280,7 @@ static inline bool token_expect_identifier(t_lexstate *state, t_intern const *st
         lex_next_token(state);
         return true;
     }
-    push_errorf(state->loc, "expected keyword %s, got %s", state->last_token.str_value->str, str->str);
+    push_errorf(state->last_token.loc, "expected keyword %s, got %s", state->last_token.str_value->str, str->str);
     return false;
 }
 
