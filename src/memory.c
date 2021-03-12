@@ -26,7 +26,7 @@ static ptr ptr_get_alignment_offset(ptr p, ptr align) {
 
 static void *x_malloc(ptr size) {
     void *result = malloc(size);
-    printf("allocating %llu bytes, returning address at %p\n", size, result);
+    //printf("allocating %llu bytes, returning address at %p\n", size, result);
     return result;
 }
 
