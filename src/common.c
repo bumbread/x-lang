@@ -25,10 +25,18 @@ struct {
     char const *filename;
     i64 line;
     i64 offset;
-} typedef t_location;
+} typedef t_location_;
 
 struct {
-    t_location loc;
+    char const *filename;
+    char const *stream_start;
+    char const *token_start;
+    //i64 line;
+    //i64 offset;
+} typedef t_token_location;
+
+struct {
+    t_token_location loc;
     char *msg;
 } typedef t_error;
 
@@ -52,15 +60,37 @@ void init_error_buffer(int set_max_errors) {
     }
 }
 
+t_location_ get_file_location(t_token_location loc) {
+    t_location_ result;
+    result.filename = loc.filename;
+    result.line = 1;
+    result.offset = 1;
+    for(char const *s = loc.stream_start;
+        (*s != 0) && (s != loc.token_start);
+        s += 1) {
+        switch(*s) {
+            case '\n': {
+                result.line += 1;
+                result.offset = 1;
+            } break;
+            case '\r': break;
+            default: {
+                result.offset += 1;
+            }
+        }
+    }
+    return result;
+}
+
 void print_error_buffer(void) {
     for(i64 error_index = 0; error_index < now_errors; error_index += 1) {
         t_error err = errors[error_index];
-        printf("%s(%lld,%lld): %s\n", err.loc.filename, 
-               err.loc.line, err.loc.offset, err.msg);
+        t_location_ loc = get_file_location(err.loc);
+        printf("%s(%lld,%lld): %s\n", loc.filename, loc.line, loc.offset, err.msg);
     }
 }
 
-void push_errorf(t_location loc, char const *message, ...) {
+void push_errorf(t_token_location loc, char const *message, ...) {
     if(now_errors < max_errors) {
         errors[now_errors].loc = loc;
         va_list args;

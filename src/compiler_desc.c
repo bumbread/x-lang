@@ -32,7 +32,7 @@ struct {
     t_token_flags flags;
     char const *start;
     char const *end;
-    t_location loc;
+    t_token_location loc;
     union {
         i64 int_value;
         f64 flt_value;
@@ -307,7 +307,7 @@ struct t_expr_data_ {
     f_expr_cat cat;
     f_expr_flags flags;
     t_type_data *type;
-    t_location loc;
+    t_token_location loc;
     union {
         t_value_data value;
         t_operation_data operation;
@@ -318,7 +318,7 @@ struct t_expr_data_ {
 
 struct t_stmt_data_ {
     f_stmt_cat cat;
-    t_location loc;
+    t_token_location loc;
     union {
         t_while_data while_data;
         t_if_data if_data;

@@ -2,37 +2,22 @@
 struct {
     char const *stream;
     t_token last_token;
-    t_location _loc;
+    t_token_location loc;
 } typedef t_lexstate;
 
 static void lex_init(t_lexstate *state, char const *filename, char const *stream) {
+    state->loc.filename = filename;
+    state->loc.stream_start = stream;
     state->stream = stream;
-    state->_loc.line = 1;
-    state->_loc.offset = 1;
-    state->_loc.filename = filename;
     t_token eof_token; // to be removed later
     eof_token.start = eof_token.end = null;
     eof_token.kind = TOKEN_eof;
     state->last_token = eof_token;
 }
 
-static inline char const lex_next_char(t_lexstate *state) {
-    char result = *state->stream;
-    state->stream += 1;
-    state->_loc.offset += 1;
-    if(result == '\r') {
-        state->_loc.offset = 1;
-    }
-    else if(result == '\n') {
-        state->_loc.line += 1;
-        state->_loc.offset = 1;
-    }
-    return result;
-}
-
 static inline bool lex_match_char(t_lexstate *state, char c) {
     if(*state->stream == c) {
-        lex_next_char(state);
+        state->stream += 1;
         return true;
     }
     return false;
@@ -63,18 +48,19 @@ static i64 lex_string_escape(char const *stream, char const **end) {
 
 static void lex_next_token(t_lexstate *state) {
     while(isspace(*state->stream)) {
-        lex_next_char(state);
+        state->stream += 1;
     }
     
     char const *start = state->stream;
     state->last_token.flags = 0;
-    state->last_token.loc = state->_loc;
+    state->last_token.loc = state->loc;
+    state->last_token.loc.token_start = state->stream;
     
     // lex identifiers
     if(isalpha(*state->stream) || *state->stream == '_') {
         state->last_token.kind = TOKEN_idn;
         while(isalnum(*state->stream) || *state->stream == '_') {
-            lex_next_char(state);
+            state->stream += 1;
         }
         char const *end = state->stream;
         t_intern const *string_value = intern_string(start, end);
@@ -118,7 +104,7 @@ static void lex_next_token(t_lexstate *state) {
         if(lex_match_char(state, '\\')) {
             val = lex_string_escape(state->stream, &state->stream);
             if(val > 0xff) {
-                push_errorf(state->_loc, "value %x is unacceptable for a char literal", val);
+                push_errorf(state->loc, "value %x is unacceptable for a char literal", val);
             }
         }
         else if(isprint(*state->stream)) {
@@ -126,13 +112,13 @@ static void lex_next_token(t_lexstate *state) {
             state->stream += 1;
         }
         else {
-            push_errorf(state->_loc, "value %x is unacceptable for a char literal", *state->stream);
+            push_errorf(state->loc, "value %x is unacceptable for a char literal", *state->stream);
         }
         state->last_token.kind = TOKEN_int;
         //state->last_token.subkind = SUBKIND_char;
         state->last_token.int_value = val;
         if(!lex_match_char(state, '\'')) {
-            push_errorf(state->_loc, "expected a char literal to close");
+            push_errorf(state->loc, "expected a char literal to close");
         }
     }
     else if(lex_match_char(state, '"')) { // string literal
@@ -143,7 +129,7 @@ static void lex_next_token(t_lexstate *state) {
             else if(lex_match_char(state, '\\')) {
                 i64 val = lex_string_escape(state->stream, &state->stream);
                 if(val > 0xff) {
-                    push_errorf(state->_loc, "value %x is unacceptable for a hex escape", val);
+                    push_errorf(state->loc, "value %x is unacceptable for a hex escape", val);
                 }
                 string_builder_append_char((char)val);
             }
@@ -214,7 +200,7 @@ static void lex_next_token(t_lexstate *state) {
         }
         else {
             state->last_token.kind = *state->stream;
-            lex_next_char(state);
+            state->stream += 1;
         }
     }
     char const *end = state->stream;

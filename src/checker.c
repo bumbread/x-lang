@@ -53,7 +53,7 @@ static t_decl_data *get_decl_by_name_noerr(t_intern const *var_name) {
     return null;
 }
 
-static t_decl_data *get_decl_by_name(t_location at, t_intern const *var_name) {
+static t_decl_data *get_decl_by_name(t_token_location at, t_intern const *var_name) {
     for(t_decl_stack_node *decl_node = decls.last;
         decl_node != null;
         decl_node = decl_node->prev) {
@@ -321,7 +321,7 @@ static bool check_type_compat(t_expr_data *expr, t_type_data *type) {
     return true;
 }
 
-static void check_decl(t_location at, t_decl_data *decl_node);
+static void check_decl(t_token_location at, t_decl_data *decl_node);
 
 static void check_function_stmt(t_stmt_data *stmt, t_type_data *return_type) {
     assert(stmt != null);
@@ -406,7 +406,7 @@ static void check_function_stmts(t_stmt_list *block, t_type_data *return_type) {
     }
 }
 
-static void check_function_param_decl(t_location at, t_decl_data *decl) {
+static void check_function_param_decl(t_token_location at, t_decl_data *decl) {
     assert(decl != null);
     assert(decl->name != null);
     assert(decl->type != null);
@@ -428,7 +428,7 @@ static void check_function_param_decl(t_location at, t_decl_data *decl) {
     check_type_data(decl->type);
 }
 
-static void check_decl(t_location at, t_decl_data *decl) {
+static void check_decl(t_token_location at, t_decl_data *decl) {
     assert(decl != null);
     assert(decl->name != null);
     assert(decl->type != null);
