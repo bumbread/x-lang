@@ -53,14 +53,14 @@ int main(void) {
     t_lexstate state;
     lex_init(&state, filename, (char *)buf);
     lex_next_token(&state);
-    t_decl_list *code = parse_global_scope(&state);
+    t_stmt_list *code = parse_global_scope(&state);
     print_error_buffer();
     if(now_errors == 0) {
         check_code(code);
         print_error_buffer();
     }
     
-    print_decl_list(code);
+    print_code_root(code);
     //ast_node_print_tree(code, 0);
 #if 0
     t_ast_node *code = parse_ast_node_global_level(":int");

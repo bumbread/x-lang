@@ -53,7 +53,7 @@ static t_decl_data *get_decl_by_name_noerr(t_intern const *var_name) {
     return null;
 }
 
-static t_decl_data *get_decl_by_name(t_intern const *var_name) {
+static t_decl_data *get_decl_by_name(t_location at, t_intern const *var_name) {
     for(t_decl_stack_node *decl_node = decls.last;
         decl_node != null;
         decl_node = decl_node->prev) {
@@ -66,7 +66,7 @@ static t_decl_data *get_decl_by_name(t_intern const *var_name) {
             return decl;
         }
     }
-    push_errorf("name %s was not declared!", var_name->str);
+    push_errorf(at, "name %s was not declared!", var_name->str);
     return null;
 }
 
@@ -88,7 +88,7 @@ static void check_derive_expression_type(t_expr_data *expr) {
             assert(expr->var_name != null);
             t_type_data *type = get_variable_type(expr->var_name);
             if(type == null) {
-                push_errorf("can not find variable named '%s'", expr->var_name->str);
+                push_errorf(expr->loc, "can not find variable named '%s'", expr->var_name->str);
             }
             else {
                 expr->flags |= EXPR_lvalue;
@@ -119,20 +119,20 @@ static void check_derive_expression_type(t_expr_data *expr) {
                 case UNARY_add:
                 case UNARY_sub: {
                     if(!is_arithmetic_type(op1->type)) {
-                        push_errorf("unary arithmetic is not supported for %s type",
+                        push_errorf(expr->loc, "unary arithmetic is not supported for %s type",
                                     get_short_type_name(op1->type));
                     }
                     expr->type = op1->type;
                 } break;
                 case UNARY_deref: {
                     if(!can_dereference_type(op1->type)) {
-                        push_errorf("dereference is not supported for %s type", get_short_type_name(op1->type));
+                        push_errorf(expr->loc, "dereference is not supported for %s type", get_short_type_name(op1->type));
                     }
                     expr->type = op1->type->pointer_base;
                 } break;
                 case UNARY_addr: {
                     if((op1->flags & EXPR_lvalue) == 0) {
-                        push_errorf("taking address of non-lvalue");
+                        push_errorf(expr->loc, "taking address of non-lvalue");
                     }
                     expr->type = make_type_pointer_to(op1->type);
                 } break;
@@ -145,6 +145,9 @@ static void check_derive_expression_type(t_expr_data *expr) {
             t_expr_data *op2 = expr->operation.expr2;
             check_derive_expression_type(op1);
             check_derive_expression_type(op2);
+            if(op1->type == null || op2->type == null) {
+                return;
+            }
             
             switch(expr->operation.cat) {
                 case BINARY_add:
@@ -152,7 +155,7 @@ static void check_derive_expression_type(t_expr_data *expr) {
                 case BINARY_mul:
                 case BINARY_div: {
                     if(!are_types_arithmetical(op1->type, op2->type)) {
-                        push_errorf("binary arithmetic is not supported between %s and %s types", 
+                        push_errorf(expr->loc, "binary arithmetic is not supported between %s and %s types", 
                                     get_short_type_name(op1->type), get_short_type_name(op2->type));
                     }
                     expr->type = op1->type;
@@ -162,7 +165,7 @@ static void check_derive_expression_type(t_expr_data *expr) {
                 case BINARY_leq:
                 case BINARY_geq: {
                     if(!are_types_relational(op1->type, op2->type)) {
-                        push_errorf("can not compare %s type to %s type",
+                        push_errorf(expr->loc, "can not compare %s type to %s type",
                                     get_short_type_name(op1->type), get_short_type_name(op2->type));
                     }
                     expr->type = make_bool_type();
@@ -170,28 +173,28 @@ static void check_derive_expression_type(t_expr_data *expr) {
                 case BINARY_eq:
                 case BINARY_neq: {
                     if(!are_types_comparable(op1->type, op2->type)) {
-                        push_errorf("can not compare %s type to %s type",
+                        push_errorf(expr->loc, "can not compare %s type to %s type",
                                     get_short_type_name(op1->type), get_short_type_name(op2->type));
                     }
                     expr->type = make_bool_type();
                 } break;
                 case BINARY_and: {
                     if(!are_types_logical(op1->type, op2->type)) {
-                        push_errorf("operation AND is not available for %s type and %s type",
+                        push_errorf(expr->loc, "operation AND is not available for %s type and %s type",
                                     get_short_type_name(op1->type), get_short_type_name(op2->type));
                     }
                     expr->type = make_bool_type();
                 } break;
                 case BINARY_or: {
                     if(!are_types_logical(op1->type, op2->type)) {
-                        push_errorf("operation OR is not available for %s type and %s type",
+                        push_errorf(expr->loc, "operation OR is not available for %s type and %s type",
                                     get_short_type_name(op1->type), get_short_type_name(op2->type));
                     }
                     expr->type = make_bool_type();
                 }
                 case BINARY_subscript: {
                     if(!can_subscript_type(op1->type)) {
-                        push_errorf("can not subscript type %s", get_short_type_name(op1->type));
+                        push_errorf(expr->loc, "can not subscript type %s", get_short_type_name(op1->type));
                         break;
                     }
                     if(op1->type->cat == TYPE_string) {
@@ -215,19 +218,23 @@ static void check_derive_expression_type(t_expr_data *expr) {
             t_expr_data *callee = expr->func.callee;;
             check_derive_expression_type(callee);
             t_type_data *callee_type = callee->type;
+            if(callee_type == null) {
+                return;
+            }
+            
             if(!can_call_type(callee_type)) {
-                push_errorf("%s type is not callable", get_short_type_name(callee->type));
+                push_errorf(expr->loc, "%s type is not callable", get_short_type_name(callee->type));
                 break;
             }
             
             i64 formal_param_count = callee_type->func.parameters->count;
             i64 actual_param_count = expr->func.parameters->count;
             if(actual_param_count < formal_param_count) {
-                push_errorf("too many actual parameters (%lld given, %lld expected)",
+                push_errorf(expr->loc, "too many actual parameters (%lld given, %lld expected)",
                             actual_param_count, formal_param_count);
             }
             else if(formal_param_count > actual_param_count) {
-                push_errorf("not enough actual parameters (%lld given, %lld expected)",
+                push_errorf(expr->loc, "not enough actual parameters (%lld given, %lld expected)",
                             actual_param_count, formal_param_count);
             }
             else {
@@ -249,11 +256,13 @@ static void check_derive_expression_type(t_expr_data *expr) {
                     check_derive_expression_type(actual_param);
                     
                     t_type_data *actual_param_type = actual_param->type;
-                    assert(actual_param_type != null);
+                    if(actual_param_type == null) {
+                        return;
+                    }
                     
                     if(!can_assign_type_to_another(formal_param_type, actual_param_type)) {
                         // TODO(bumbread): long parameter names here.
-                        push_errorf("at argument index %ull, actual %s parameter can not be assigned to formal %s parameter", 
+                        push_errorf(expr->loc, "at argument index %ull, actual %s parameter can not be assigned to formal %s parameter", 
                                     param_no, 
                                     get_short_type_name(formal_param_type),
                                     get_short_type_name(actual_param_type));
@@ -268,29 +277,32 @@ static void check_derive_expression_type(t_expr_data *expr) {
             
             t_expr_data *op1 = expr->operation.expr1;
             check_derive_expression_type(op1);
+            if(op1->type == null) return;
             
             t_expr_data *op2 = expr->operation.expr2;
             if(op2 != null) {
                 check_derive_expression_type(op2);
+                if(op2->type == null) return;
             }
             
             t_expr_data *op3 = expr->operation.expr3;
             if(op3 != null) {
                 check_derive_expression_type(op3);
+                if(op3->type == null) return;
             }
             
             // the only ternary operator.
             assert(expr->operation.cat == TERNARY_slice);
             
             if(!can_slice_type(op1->type)) {
-                push_errorf("%s type can not be sliced", get_short_type_name(op1->type));
+                push_errorf(op1->loc, "%s type can not be sliced", get_short_type_name(op1->type));
                 break;
             }
-            if(op1 != null && op1->type->cat != TYPE_int) {
-                push_errorf("first slice index has to be a number");
-            }
             if(op2 != null && op2->type->cat != TYPE_int) {
-                push_errorf("second slice index has to be a number");
+                push_errorf(op2->loc, "first slice index has to be a number");
+            }
+            if(op3 != null && op3->type->cat != TYPE_int) {
+                push_errorf(op3->loc, "second slice index has to be a number");
             }
             // should hard set it to slice.
             expr->type = op1->type;
@@ -302,7 +314,6 @@ static void check_derive_expression_type(t_expr_data *expr) {
 // returns false if you shouldn't assume that the type was derived.
 static bool check_type_compat(t_expr_data *expr, t_type_data *type) {
     assert(expr != null);
-    if(expr->type == null) check_derive_expression_type(expr);
     assert(expr->type != null);
     if(!can_assign_type_to_another(type, expr->type)) {
         return false;
@@ -310,7 +321,7 @@ static bool check_type_compat(t_expr_data *expr, t_type_data *type) {
     return true;
 }
 
-static void check_decl(t_decl_data *decl_node);
+static void check_decl(t_location at, t_decl_data *decl_node);
 
 static void check_function_stmt(t_stmt_data *stmt, t_type_data *return_type) {
     assert(stmt != null);
@@ -327,7 +338,7 @@ static void check_function_stmt(t_stmt_data *stmt, t_type_data *return_type) {
             check_derive_expression_type(condition);
             if(condition->type != null) {
                 if(!is_logical_type(condition->type)) {
-                    push_errorf("the condition in 'if' statement must be a logical expression. Met %s type",
+                    push_errorf(stmt->loc, "the condition in 'if' statement must be a logical expression. Met %s type",
                                 get_short_type_name(condition->type));
                 }
             }
@@ -343,7 +354,7 @@ static void check_function_stmt(t_stmt_data *stmt, t_type_data *return_type) {
             t_expr_data *condition = stmt->while_data.condition;
             check_derive_expression_type(condition);
             if(!is_logical_type(condition->type)) {
-                push_errorf("the condition in 'while' statement must be a boolean expression. Met %s type",
+                push_errorf(stmt->loc, "the condition in 'while' statement must be a boolean expression. Met %s type",
                             get_short_type_name(condition->type));
             }
             if(stmt->while_data.block != null) {
@@ -353,8 +364,11 @@ static void check_function_stmt(t_stmt_data *stmt, t_type_data *return_type) {
         case STMT_return: {
             if(stmt->return_expr != null) {
                 check_derive_expression_type(stmt->return_expr);
+                if(stmt->return_expr->type == null) {
+                    return;
+                }
                 if(!check_type_compat(stmt->return_expr, return_type)) {
-                    push_errorf("can not assign %s type to variable of type %s",
+                    push_errorf(stmt->loc, "can not assign %s type to variable of type %s",
                                 get_short_type_name(stmt->return_expr->type), get_short_type_name(return_type));
                 }
             }
@@ -362,7 +376,7 @@ static void check_function_stmt(t_stmt_data *stmt, t_type_data *return_type) {
         case STMT_break:    break; // what?
         case STMT_continue: break; // ok.
         case STMT_decl: {
-            check_decl(stmt->decl_data);
+            check_decl(stmt->loc, stmt->decl_data);
         } break;
         case STMT_block: {
             stack_list_push_frame(&decls);
@@ -392,7 +406,7 @@ static void check_function_stmts(t_stmt_list *block, t_type_data *return_type) {
     }
 }
 
-static void check_function_param_decl(t_decl_data *decl) {
+static void check_function_param_decl(t_location at, t_decl_data *decl) {
     assert(decl != null);
     assert(decl->name != null);
     assert(decl->type != null);
@@ -405,7 +419,7 @@ static void check_function_param_decl(t_decl_data *decl) {
         t_decl_data *prev_decl = prev_decl_node->data;
         if(prev_decl->name == decl->name) {
             // TODO(bumbread): token id.
-            push_errorf("variable with name '%s' is already declared", decl->name->str);
+            push_errorf(at, "variable with name '%s' is already declared", decl->name->str);
             break;
         }
     }
@@ -414,7 +428,7 @@ static void check_function_param_decl(t_decl_data *decl) {
     check_type_data(decl->type);
 }
 
-static void check_decl(t_decl_data *decl) {
+static void check_decl(t_location at, t_decl_data *decl) {
     assert(decl != null);
     assert(decl->name != null);
     assert(decl->type != null);
@@ -427,7 +441,7 @@ static void check_decl(t_decl_data *decl) {
         t_decl_data *prev_decl = prev_decl_node->data;
         if(prev_decl->name == decl->name) {
             // TODO(bumbread): token id.
-            push_errorf("variable with name '%s' is already declared", decl->name->str);
+            push_errorf(at, "variable with name '%s' is already declared", decl->name->str);
             break;
         }
     }
@@ -438,7 +452,7 @@ static void check_decl(t_decl_data *decl) {
     switch(decl->cat) {
         case DECL_block_value: {
             if(decl->type->cat != TYPE_function) {
-                push_errorf("only function declaration can have block initializers ('{...}')");
+                push_errorf(at, "only function declaration can have block initializers ('{...}')");
                 return;
             }
             t_type_data *type = decl->type;
@@ -456,11 +470,11 @@ static void check_decl(t_decl_data *decl) {
                 t_decl_data *param = param_node->data;
                 assert(param != null);
                 if(param->name != null) {
-                    check_function_param_decl(param);
+                    check_function_param_decl(at, param);
                     decl_push(&decls, param);
                 }
                 else {
-                    push_errorf("function parameter #%d has to be named", param_index);
+                    push_errorf(at, "function parameter #%d has to be named", param_index);
                 }
                 param_index += 1;
             }
@@ -470,8 +484,12 @@ static void check_decl(t_decl_data *decl) {
         } break;
         case DECL_expr_value: {
             t_expr_data *value = decl->value;
-            if(!check_type_compat(decl->value, decl->type)) {
-                push_errorf("can not assign %s type to variable of type %s",
+            check_derive_expression_type(value);
+            if(value->type == null) {
+                return;
+            }
+            if(!check_type_compat(value, decl->type)) {
+                push_errorf(at, "can not assign %s type to variable of type %s",
                             get_short_type_name(value->type), get_short_type_name(decl->type));
             }
         } break;
@@ -480,19 +498,21 @@ static void check_decl(t_decl_data *decl) {
     }
 }
 
-static void check_code(t_decl_list *root) {
+static void check_code(t_stmt_list *root) {
     decls.first = null;
     decls.last = null;
     
     //scope = root;
     
     bool main_found = false;
-    for(t_decl_list_node *decl_node = root->first;
-        decl_node != null;
-        decl_node = decl_node->next) {
-        t_decl_data *decl = decl_node->data;
+    for(t_stmt_list_node *stmt_node = root->first;
+        stmt_node != null;
+        stmt_node = stmt_node->next) {
+        t_stmt_data *stmt = stmt_node->data;
+        t_decl_data *decl = stmt->decl_data;
+        assert(stmt->cat == STMT_decl);
         assert(decl != null);
-        check_decl(decl);
+        check_decl(stmt->loc, decl);
         
         if(decl->name == main_name) {
             main_found = true;
@@ -501,6 +521,6 @@ static void check_code(t_decl_list *root) {
     
     // TODO(bumbread): libraries don't require main function.
     if(!main_found) {
-        push_errorf("error: main function not found!");
+        push_errorf(null_location, "error: main function not found!");
     }
 }

@@ -11,6 +11,7 @@ static void lex_init(t_lexstate *state, char const *filename, char const *stream
     state->stream = stream;
     state->loc.line = 1;
     state->loc.offset = 1;
+    state->loc.filename = filename;
     t_token eof_token; // to be removed later
     eof_token.start = eof_token.end = null;
     eof_token.kind = TOKEN_eof;
@@ -46,13 +47,10 @@ static u64 lex_integer(u64 base, char const *stream, char const **end) {
     return value;
 }
 
-static char lex_string_escape(char const *stream, char const **end) {
-    char val;
+static i64 lex_string_escape(char const *stream, char const **end) {
+    i64 val;
     if(is_digit_in_base(16, *stream)) {
-        u64 result = lex_integer(16, stream, &stream);
-        if(result > 0xff) {
-            push_errorf("value %x is unacceptable for a char literal", result);
-        }
+        i64 result = lex_integer(16, stream, &stream);
         val = (char)result;
     }
     else {
@@ -114,22 +112,25 @@ static void lex_next_token(t_lexstate *state) {
         }
     }
     else if(lex_match_char(state, '\'')) { // character literal
-        u64 val;
+        i64 val;
         if(lex_match_char(state, '\\')) {
             val = lex_string_escape(state->stream, &state->stream);
+            if(val > 0xff) {
+                push_errorf(state->loc, "value %x is unacceptable for a char literal", val);
+            }
         }
         else if(isprint(*state->stream)) {
             val = *state->stream;
             state->stream += 1;
         }
         else {
-            push_errorf("value %x is unacceptable for a char literal", *state->stream);
+            push_errorf(state->loc, "value %x is unacceptable for a char literal", *state->stream);
         }
         state->last_token.kind = TOKEN_int;
         //state->last_token.subkind = SUBKIND_char;
         state->last_token.int_value = val;
         if(!lex_match_char(state, '\'')) {
-            push_errorf("expected a char literal to close");
+            push_errorf(state->loc, "expected a char literal to close");
         }
     }
     else if(lex_match_char(state, '"')) { // string literal
@@ -138,7 +139,11 @@ static void lex_next_token(t_lexstate *state) {
             //char c = state_next_char(state);
             if(lex_match_char(state, '"')) break;
             else if(lex_match_char(state, '\\')) {
-                string_builder_append_char(lex_string_escape(state->stream, &state->stream));
+                i64 val = lex_string_escape(state->stream, &state->stream);
+                if(val > 0xff) {
+                    push_errorf(state->loc, "value %x is unacceptable for a hex escape", val);
+                }
+                string_builder_append_char((char)val);
             }
             else {
                 string_builder_append_char(*state->stream++);
@@ -237,9 +242,7 @@ static inline bool token_expect_kind(t_lexstate *state, t_token_kind kind) {
         lex_next_token(state);
         return true;
     }
-    push_errorf("%s(%d, %d): expected token %s, got %s",
-                state->filename,
-                state->loc.line, state->loc.offset,
+    push_errorf(state->loc, "expected token %s, got %s",
                 get_token_kind_name(kind),
                 get_token_string(&state->last_token));
     return false;
@@ -249,9 +252,7 @@ static inline bool token_expect_peek_kind(t_lexstate *state, t_token_kind kind) 
     if(state->last_token.kind == kind) {
         return true;
     }
-    push_errorf("%s(%d, %d): expected token %s, got %s",
-                state->filename,
-                state->loc.line, state->loc.offset,
+    push_errorf(state->loc, "expected token %s, got %s",
                 get_token_kind_name(kind),
                 get_token_string(&state->last_token));
     return false;
@@ -278,7 +279,7 @@ static inline bool token_expect_identifier(t_lexstate *state, t_intern const *st
         lex_next_token(state);
         return true;
     }
-    push_errorf("expected keyword %s, got %s", state->last_token.str_value->str, str->str);
+    push_errorf(state->loc, "expected keyword %s, got %s", state->last_token.str_value->str, str->str);
     return false;
 }
 

@@ -217,12 +217,14 @@ static void print_stmt(t_stmt_data *stmt, int level) {
     }
 }
 
-static void print_decl_list(t_decl_list *decls) {
-    for(t_decl_list_node *decl_node = decls->first;
-        decl_node != null;
-        decl_node = decl_node->next) {
-        t_decl_data *decl = decl_node->data;
-        print_decl(decl, 0);
+static void print_code_root(t_stmt_list *stmts) {
+    for(t_stmt_list_node *stmt_node = stmts->first;
+        stmt_node != null;
+        stmt_node = stmt_node->next) {
+        t_stmt_data *stmt = stmt_node->data;
+        assert(stmt->cat == STMT_decl);
+        assert(stmt->decl_data != null);
+        print_stmt(stmt, 0);
         printf("\n");
     }
 }

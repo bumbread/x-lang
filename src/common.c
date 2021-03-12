@@ -21,6 +21,17 @@ u64      typedef ptr;
 
 #define array_count(arr) (sizeof(arr)/sizeof((arr)[0]))
 
+struct {
+    char const *filename;
+    i64 line;
+    i64 offset;
+} typedef t_location;
+
+struct {
+    t_location loc;
+    char *msg;
+} typedef t_error;
+
 void panicf(char *message, ...) {
     va_list args;
     va_start(args, message);
@@ -31,24 +42,30 @@ void panicf(char *message, ...) {
 
 static int max_errors = -1;
 static int now_errors = 0;
-static char (*errors)[1024];
+static t_error *errors;
 
 void init_error_buffer(int set_max_errors) {
     max_errors = set_max_errors;
-    errors = malloc(set_max_errors * sizeof(char[1024]));
-}
-
-void print_error_buffer(void) {
-    for(int error_index = 0; error_index < now_errors; error_index += 1) {
-        printf("%s\n", errors[error_index]);
+    errors = malloc(set_max_errors * sizeof(t_error));
+    for(i64 i = 0; i < max_errors; i += 1) {
+        errors[i].msg = malloc(sizeof(char)*1024);
     }
 }
 
-void push_errorf(char const *message, ...) {
+void print_error_buffer(void) {
+    for(i64 error_index = 0; error_index < now_errors; error_index += 1) {
+        t_error err = errors[error_index];
+        printf("%s(%lld,%lld): %s\n", err.loc.filename, 
+               err.loc.line, err.loc.offset, err.msg);
+    }
+}
+
+void push_errorf(t_location loc, char const *message, ...) {
     if(now_errors < max_errors) {
+        errors[now_errors].loc = loc;
         va_list args;
         va_start(args, message);
-        vsprintf(errors[now_errors], message, args);
+        vsprintf(errors[now_errors].msg, message, args);
         va_end(args);
         now_errors += 1;
     }

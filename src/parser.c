@@ -1,17 +1,11 @@
 
 static inline bool unexpected_last_token(t_lexstate *state) {
-    push_errorf("%s(%d, %d): unexpected token %s.",
-                state->filename,
-                state->last_token.loc.line, state->last_token.loc.offset,
-                get_token_string(&state->last_token));
+    push_errorf(state->loc, "unexpected token %s.", get_token_string(&state->last_token));
     return false;
 }
 
-static inline void parse_error(char const *string, t_location loc) {
-    push_errorf("%s(%d, %d): %s",
-                loc.filename,
-                loc.line, loc.offset,
-                string);
+static inline void parse_error(t_lexstate *state, char const *string) {
+    push_errorf(state->loc, "%s", string);
 }
 
 //--------------------||
@@ -71,7 +65,7 @@ static t_expr_data *parse_expr_value(t_lexstate *state) {
             if(expr == null) return null;
             expr_list_push(parameter_list, expr);
             if(!token_is_kind(state, ')') && !token_match_kind(state, ',')) {
-                parse_error("expected either , or )", state->loc);
+                parse_error(state, "expected either , or )");
                 return null;
             }
         }
@@ -398,7 +392,7 @@ static t_type_data *parse_type(t_lexstate *state) {
             type = make_byte_type();
         }
         else {
-            parse_error("aliase types are not supported", state->loc);
+            parse_error(state, "aliase types are not supported");
             return null;
         }
         lex_next_token(state);
@@ -431,7 +425,7 @@ static t_type_data *parse_type(t_lexstate *state) {
                 if(param_decl == null) return null;
                 decl_list_push(decl_list, param_decl);
                 if(!token_match_kind(state, ',') && !token_is_kind(state, ')')) {
-                    parse_error("expected either , or )", state->loc);
+                    parse_error(state, "expected either , or )");
                     return null;
                 }
             }
@@ -450,7 +444,7 @@ static t_decl_data *parse_declaration(t_lexstate *state) {
     
     if(token_expect_peek_kind(state, TOKEN_idn)) {
         if(token_is_keyword(&state->last_token)) {
-            push_errorf("keywords are not allowed as variable name", state->loc);
+            push_errorf(state->loc, "keywords are not allowed as variable name");
             return null;
         }
         name = state->last_token.str_value;
@@ -584,17 +578,21 @@ static t_stmt_data *parse_stmt_block(t_lexstate *state) {
     return block;
 }
 
-static t_decl_list *parse_global_scope(t_lexstate *state) {
-    t_decl_list *decls = alloc_decl_list();
+static t_stmt_list *parse_global_scope(t_lexstate *state) {
+    t_stmt_list *stmts = alloc_stmt_list();
     while(!token_is_kind(state, TOKEN_eof)) {
-        token_expect_kind(state, ':');
-        t_decl_data *decl = parse_declaration(state);
-        if(decl == null) {
-            parse_error("unable to parse declaration", state->loc);
+        t_stmt_data *stmt = parse_stmt(state);
+        if(stmt == null) {
+            parse_error(state, "unable to parse stmt");
         }
-        else decl_list_push(decls, decl);
+        else if(stmt->cat == STMT_decl){
+            stmt_list_push(stmts, stmt);
+        }
+        else {
+            parse_error(state, "only declarations are allowed in top-level code");
+        }
     }
-    return decls;
+    return stmts;
 }
 
 // debug functions
@@ -614,11 +612,11 @@ static t_stmt_data *DEBUG_parse_ast_node_stmt_level(char const *stmt) {
     print_error_buffer();
     return code;
 }
-static t_decl_list *parse_ast_node_global_level(char const *code_str) {
+static t_stmt_list *parse_ast_node_global_level(char const *code_str) {
     t_lexstate state;
     lex_init(&state, "@test", code_str);
     lex_next_token(&state);
-    t_decl_list *code = parse_global_scope(&state);
+    t_stmt_list *code = parse_global_scope(&state);
     print_error_buffer();
     return code;
 }

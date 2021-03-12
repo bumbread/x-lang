@@ -1,11 +1,5 @@
 // TOKENS
 
-struct {
-    char const *filename;
-    u64 line;
-    u64 offset;
-} typedef t_location;
-
 enum {
     TOKEN_eof = 0,   // end of file
     // All ascii characters are a separate token
