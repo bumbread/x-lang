@@ -498,7 +498,7 @@ static void check_decl(t_token_location at, t_decl_data *decl) {
     }
 }
 
-static void check_code(t_stmt_list *root) {
+static bool check_code(t_stmt_list *root) {
     decls.first = null;
     decls.last = null;
     
@@ -519,8 +519,5 @@ static void check_code(t_stmt_list *root) {
         }
     }
     
-    // TODO(bumbread): libraries don't require main function.
-    if(!main_found) {
-        push_errorf(null_location, "error: main function not found!");
-    }
+    return main_found;
 }
